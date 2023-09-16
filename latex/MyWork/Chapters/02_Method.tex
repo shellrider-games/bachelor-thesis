@@ -30,3 +30,11 @@ I used a subset of the dataset provided by \textcite{eitz2012hdhso} to
 train my classification models. Only the classes "cat" and "dog" were taken as
 training data for my models. To train and evaluate my models I used the
 scikit-learn library introduced by \textcite{scikit-learn}.
+
+\subsection*{kNN classifier}
+I trained a kNN classifier with the pixel values of the input images. Before
+using the values to train the model, I resized the images to a size of 64 times 
+64 pixels, and flattened the array to get a feature vector with 12288 entries, 
+ranging from 0 to 255 in value. To find the best-performing k, I performed a
+grid search with cross-validation on 3 folds leading to k = 5 as the model with 
+the highest accuracy at 61.8798\%.
