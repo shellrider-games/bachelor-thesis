@@ -37,3 +37,62 @@ series = {MMAsia '21}
  pages={2825--2830},
  year={2011}
 }
+
+@mastersthesis{korpitsch-2023-sao,
+  title =      "Semantic-Aware Animation of Hand-Drawn Characters",
+  author =     "Thorsten Korpitsch",
+  year =       "2023",
+  abstract =   "In recent years there has been a lot of research in the area
+               of edutainment, which facilitates effective learning
+               processes by increasing the engagement of the learners.
+               Guided visualisations, such as audio-guided museum tours or
+               Augmented Reality-guided city tours, are one of the
+               potential applications. Guided visualisations are a form of
+               mental practice which traditionally involves verbal guidance
+               that guides a user through a series of visualisations. With
+               the technique of Augmented Reality, one can integrate
+               additional information to guide users or embody verbal
+               guidance with a virtual character, which enables an engaging
+               experience. In this thesis, we aim to make a first step
+               towards guided visualisation by introducing a hand-drawn
+               character for instruction purposes. We especially focus on
+               animation, since character animations are used in different
+               applications, such as computer graphics, but can be hardly
+               generated without certain pre-knowledge. Here, we present a
+               novel pipeline for automatically generating believable
+               movements for hand-drawn characters. The approach consists
+               of five steps. (1) the hand-drawn character is detected from
+               an input image, and (2) the sub-parts of the drawn
+               character, such as the legs and thehead, are identified,
+               respectively. (3) A bone skeleton for animation is extracted
+               and augmented with the semantic information from the
+               previous step. (4) Based on the augmented skeleton, we
+               assign a super-class that the skeleton belongs to, i.e.,
+               quadruped, flying or humanoid, and match the end-effectors
+               of the skeleton to the end-effectors of the reference
+               skeleton of the super-class. (5) Finally, we generate a
+               triangular mesh from the input illustration. Once the
+               matching reference skeleton and the hand-drawn character are
+               overlayed, the character is animated and can attract users
+               in different applications. To show the feasibility of our
+               approach, we evaluate the proposed pipeline with a set of
+               hand-drawn characters showing several well-articulate
+               drawings.",
+  pages =      "91",
+  address =    "Favoritenstrasse 9-11/E193-02, A-1040 Vienna, Austria",
+  school =     "Research Unit of Computer Graphics, Institute of Visual
+               Computing and Human-Centered Technology, Faculty of
+               Informatics, TU Wien",
+  keywords =   "computer animation, character animation",
+  URL =        "https://www.cg.tuwien.ac.at/research/publications/2023/korpitsch-2023-sao/",
+}
+
+@incollection{pytorch,
+title = {PyTorch: An Imperative Style, High-Performance Deep Learning Library},
+author = {Paszke, Adam and Gross, Sam and Massa, Francisco and Lerer, Adam and Bradbury, James and Chanan, Gregory and Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and Antiga, Luca and Desmaison, Alban and Kopf, Andreas and Yang, Edward and DeVito, Zachary and Raison, Martin and Tejani, Alykhan and Chilamkurthy, Sasank and Steiner, Benoit and Fang, Lu and Bai, Junjie and Chintala, Soumith},
+booktitle = {Advances in Neural Information Processing Systems 32},
+pages = {8024--8035},
+year = {2019},
+publisher = {Curran Associates, Inc.},
+url = {http://papers.neurips.cc/paper/9015-pytorch-an-imperative-style-high-performance-deep-learning-library.pdf}
+}

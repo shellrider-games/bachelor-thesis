@@ -38,3 +38,38 @@ using the values to train the model, I resized the images to a size of 64 times
 ranging from 0 to 255 in value. To find the best-performing k, I performed a
 grid search with cross-validation on 3 folds leading to k = 5 as the model with 
 the highest accuracy at 61.8798\%.
+
+\subsection*{CNN classifier}
+Using the same preprocessing as the kNN classifier I created a neural network
+classifier using pytorch \textcite{pytorch}. This is the network's setup:
+
+\begin{lstlisting}
+class MyNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(64*64*3, 16*16),
+            nn.ReLU(),
+            nn.Linear(16*16, 16*16),
+            nn.ReLU(),
+            nn.Linear(16*16, 2),
+            nn.Sigmoid()
+        )
+    def forward(self, x, **kwargs):
+        x = self.flatten(x)
+        logits = self.linear_relu_stack(x)
+        return logits
+\end{lstlisting}
+
+Performing a grid search with cross-validation on 2 folds on this network leads
+to a network with a lossrate of 0.001 and 1 epoch as the best performing setup
+with an accuracy of 51.25\%. This indicates to me, that the model is prone to
+overfitting and I need to probably need to augment or expand my training data.
+
+\section*{Implementing the pipeline}
+For this work, I reimplemented the pipeline proposed by
+\textcite{korpitsch-2023-sao}, and adapted the code where needed. I will further
+explain the steps described.
+
+\subsection*{Sketchdetection}
