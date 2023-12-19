@@ -40,7 +40,32 @@ grid search with cross-validation on 3 folds leading to k = 5 as the model with
 the highest accuracy at 61.8798\%.
 
 \subsection*{CNN classifier}
-Lorem ipsum
+Using the same preprocessing as the kNN classifier I created a neural network
+classifier using pytorch \textcite{pytorch}. This is the network's setup:
+
+\begin{lstlisting}
+class MyNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(64*64*3, 16*16),
+            nn.ReLU(),
+            nn.Linear(16*16, 16*16),
+            nn.ReLU(),
+            nn.Linear(16*16, 2),
+            nn.Sigmoid()
+        )
+    def forward(self, x, **kwargs):
+        x = self.flatten(x)
+        logits = self.linear_relu_stack(x)
+        return logits
+\end{lstlisting}
+
+Performing a grid search with cross-validation on 2 folds on this network leads
+to a network with a lossrate of 0.001 and 1 epoch as the best performing setup
+with an accuracy of 51.25\%. This indicates to me, that the model is prone to
+overfitting and I need to probably need to augment or expand my training data.
 
 \section*{Implementing the pipeline}
 For this work, I reimplemented the pipeline proposed by
