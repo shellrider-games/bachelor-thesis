@@ -74,11 +74,12 @@ class MyNN(nn.Module):
 Performing a grid search with cross-validation on 2 folds on this network leads
 to a network with a lossrate of 0.001 and 1 epoch as the best performing setup
 with an accuracy of 51.25\%. This indicates to me, that the model is prone to
-overfitting and I need to probably need to augment or expand my training data.
+overfitting and probably need to augment or expand the training data.
 
 \section*{Implementing the pipeline}
-For this work, I reimplemented the pipeline proposed by
-\textcite{korpitsch-2023-sao}, and adapted the code where needed. I will further
-explain the steps described.
+For this work, we reimplemented the pipeline proposed by
+\textcite{korpitsch-2023-sao}, and adapted the code where needed.
 
 \subsection*{Sketchdetection}
+To repeat the steps introduced by \textcite{korpitsch-2023-sao} we collected the
+dataset provided by \textcite{sarvadevabhatla2017sketchparse}.

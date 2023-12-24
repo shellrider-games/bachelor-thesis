@@ -1,6 +1,6 @@
 import torch
 
-from sketch_detection.sketchdetection.train import get_model_instance_segmentation
+from sketch_detection.sketchdetection.my_train import get_model_instance_segmentation
 
 def select_torch_device():
     return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
