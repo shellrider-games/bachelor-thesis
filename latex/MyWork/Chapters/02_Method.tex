@@ -48,33 +48,34 @@ entries. The images were imported as grayscale images. The SVM classifier
 performed with an accuracy of 53.7578\%.
 
 
-\subsection*{CNN classifier}
-Using the same preprocessing as the kNN classifier I created a neural network
-classifier using pytorch \textcite{pytorch}. This is the network's setup:
+\subsection*{Neural network classifier}
+We created and trained a Neural Network binary classifier using pytorch
+\textcite{pytorch}. This is the network's setup:
 
 \begin{lstlisting}
-class MyNN(nn.Module):
+    class MyNN(nn.Module):
     def __init__(self):
         super().__init__()
-        self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(64*64*3, 16*16),
+            nn.Linear(in_features=3*128*128,out_features=16*16),
             nn.ReLU(),
-            nn.Linear(16*16, 16*16),
+            nn.Linear(in_features=16*16,out_features=16*16),
             nn.ReLU(),
-            nn.Linear(16*16, 2),
-            nn.Sigmoid()
+            nn.Linear(in_features=16*16,out_features=1)
         )
     def forward(self, x, **kwargs):
-        x = self.flatten(x)
+        x = x.view(x.size(0), -1)
         logits = self.linear_relu_stack(x)
         return logits
 \end{lstlisting}
 
-Performing a grid search with cross-validation on 2 folds on this network leads
-to a network with a loss rate of 0.001 and 1 epoch as the best-performing setup
-with an accuracy of 51.25\%. This indicates to me, that the model is prone to
-overfitting and we probably need to augment or expand the training data.
+The network was trained on 80\% of a collection of in total 1544 labeled images,
+depicting sketches of cats and dogs. The images where resized to a size of
+128 times 128 pixels before being fed into the network. Training the network on
+80\% of the dataset for 500 epochs with a loss rate of 0.0001, led to the
+network performing with a 59.15\% accuracy on the unseen test data.
+
+\includegraphics[width=\textwidth]{Figures/NN_classifier_charts.png}
 
 \section*{Implementing the pipeline}
 For this work, we reimplemented the pipeline proposed by

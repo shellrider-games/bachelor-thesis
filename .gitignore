@@ -2,3 +2,4 @@
 *.jpg
 venv/
 __pycache__/
+!latex/MyWork/Figures/*
