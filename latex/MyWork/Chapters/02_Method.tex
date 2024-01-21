@@ -52,7 +52,7 @@ performed with an accuracy of 53.7578\%.
 We created and trained a Neural Network binary classifier using pytorch
 \textcite{pytorch}. This is the network's setup:
 
-\begin{lstlisting}
+\begin{python}
     class MyNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -67,15 +67,232 @@ We created and trained a Neural Network binary classifier using pytorch
         x = x.view(x.size(0), -1)
         logits = self.linear_relu_stack(x)
         return logits
-\end{lstlisting}
+\end{python}
 
 The network was trained on 80\% of a collection of in total 1544 labeled images,
 depicting sketches of cats and dogs. The images where resized to a size of
 128 times 128 pixels before being fed into the network. Training the network on
-80\% of the dataset for 500 epochs with a loss rate of 0.0001, led to the
+80\% of the dataset for 500 epochs with a learning rate of 0.0001, led to the
 network performing with a 59.15\% accuracy on the unseen test data.
 
 \includegraphics[width=\textwidth]{Figures/NN_classifier_charts.png}
+
+\subsection*{CNN classifier}
+
+We trained a Convolutional Neural Network classifier. This is the network's
+setup:
+
+\begin{python}
+    class MyCNN(nn.Module):
+    def __init__(self):
+        super(MyCNN, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32,
+        kernel_size=3, stride=1,
+        padding=1)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64,
+        kernel_size=3,
+        stride=1,
+        padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+
+        self.fc1 = nn.Linear(64 * 32 * 32, 512)
+        self.fc2 = nn.Linear(512, 1)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, 64 * 32 * 32)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+\end{python}
+
+Training the network analogous to the previously mentioned Neural Network
+classifier for 500 epochs with a learning rate of 0.0001, yielded an accuracy of
+59.15\% on unseen test data.
+
+\includegraphics*[width=\textwidth]{Figures/CNN_classifier_charts.png}
+
+Repeating the setup with a learning rate of 0.001 led to an accuracy of 63.2\%
+on unseen test data.
+
+\includegraphics*[width=\textwidth]{Figures/CNN_classifier_lr_001_charts.png}
+
+\subsection*{Enhanced CNN}
+
+We used a slightly more complex CNN architecture adding batch normalization
+after each convolutional layer. Also we added an additional Convolution.
+Additionally we use a dropout layer before the final fully connected layer.
+
+\begin{python}
+    class EnhancedCNN(nn.Module):
+        def __init__(self):
+            super(EnhancedCNN, self).__init__()
+
+            self.conv1 = nn.Conv2d(in_channels=3, out_channels=32,
+             kernel_size=3, stride=1, padding=1)
+            self.bn1 = nn.BatchNorm2d(32)
+            self.conv2 = nn.Conv2d(in_channels=32, out_channels=32,
+             kernel_size=3, stride=1, padding=1)
+            self.bn2 = nn.BatchNorm2d(32)
+            self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+            self.conv3 = nn.Conv2d(in_channels=32, out_channels=64,
+            kernel_size=3, stride=1, padding=1)
+            self.bn3 = nn.BatchNorm2d(64)
+            self.conv4 = nn.Conv2d(in_channels=64, out_channels=64,
+            kernel_size=3, stride=1, padding=1)
+            self.bn4 = nn.BatchNorm2d(64)
+            self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+            self.fc1 = nn.Linear(64 * 32 * 32, 512)
+            self.dropout1 = nn.Dropout(0.5)
+            self.fc2 = nn.Linear(512, 1)
+
+        def forward(self, x):
+            x = self.pool1(
+                F.relu(
+                    self.bn2(
+                        self.conv2(F.relu(self.bn1(self.conv1(x))))
+                    )
+                )
+            )
+
+            x = self.pool2(
+                F.relu(
+                    self.bn4(
+                        self.conv4(F.relu(self.bn3(self.conv3(x))))
+                    )
+                )
+            )
+
+            x = x.view(-1, 64 * 32 * 32)
+
+            x = F.relu(self.fc1(x))
+            x = self.dropout1(x)
+            x = self.fc2(x)
+            return x
+\end{python}
+
+Training this model with a learning rate of 0.001 for 500 epochs resulted in an
+accuracy of 64.79\% on previously unseen test data. It yielded an accuracy of
+100\% on the training data. We therefore suspect it to be overfitted.
+
+\includegraphics*[width=\textwidth]{Figures/EnhancedCNN_LR0.001_500.png}
+
+Training the model with a learning rate of 0.0001 for 500 epochs resulted in an
+accuracy of 64.07\% on previously unseen test data.
+
+\includegraphics*[width=\textwidth]{Figures/EnhancedCNN_LR0.0001_500Epochs.png}
+
+We introduced 2 additional dropout layers to the network architecture.
+The network is described like this:
+
+\begin{python}
+    class EnhancedCNNMoreDropout(nn.Module):
+    def __init__(self):
+        super(EnhancedCNNMoreDropout, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout1 = nn.Dropout(0.3)
+
+        self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        self.conv4 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn4 = nn.BatchNorm2d(64)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.dropout2 = nn.Dropout(0.4)
+
+        self.fc1 = nn.Linear(64 * 32 * 32, 512)
+        self.dropout3 = nn.Dropout(0.3)
+        self.fc2 = nn.Linear(512, 1)
+
+    def forward(self, x):
+        x = self.pool1(F.relu(self.bn2(self.conv2(F.relu(self.bn1(self.conv1(x)))))))
+        x = self.dropout1(x)
+
+        x = self.pool2(F.relu(self.bn4(self.conv4(F.relu(self.bn3(self.conv3(x)))))))
+        x = self.dropout2(x)
+
+        x = x.view(-1, 64 * 32 * 32)
+
+        x = F.relu(self.fc1(x))
+        x = self.dropout3(x)
+        x = self.fc2(x)
+        return x
+\end{python}
+
+Introducing a dropout with a value of 0.3 after each convolution block resulted
+in a model that achieved 65.43\% on previously unseen test data after being
+trained for 500 epochs with a learning rate of 0.0001.
+
+\includegraphics*[width=\textwidth]
+{Figures/EnhancedCNNMoreDropoutLR0.0001_500.png}
+
+Setting the dropout to a value of 0.1 resulted in a model that achieved an
+accuracy of 58.68\% on previously unseen test data after training for 500 epochs
+with a learning rate of 0.0001.
+
+\includegraphics*[width=\textwidth]
+{Figures/EnhancedCNNMoreDropout0.1.png}
+
+Setting the dropout to a value of 0.5 resulted in a model that achieved an
+accuracy of 67.14\% on previously unseen test data after training for 500 epochs
+with a learning rate of 0.0001. The graph led us to believe the model might
+benefit from training for a larger amount of epochs.
+
+\includegraphics*[width=\textwidth]
+{Figures/EnhancedWithDropoutLR0.0001DO0.5_500.png}
+
+Training with 2000 epochs did not yield an improvement, during our exeriment the
+model achieved an accuracy of 59.33\% on previously unseen test data after
+training.
+
+\includegraphics*[width=\textwidth]
+{Figures/EnhancedCNNWithDropout0.5_2000Epochs.png}
+
+
+
+\subsection*{ResNet50 classifier}
+We trained a ResNet50 classifier using this pytorch code:
+
+\begin{python}
+    class MyResNet50(nn.Module):
+    def __init__(self):
+        super(MyResNet50, self).__init__()
+        self.resnet = models.resnet50(pretrained=True)
+        num_features = self.resnet.fc.in_features
+        self.resnet.fc = nn.Linear(num_features, 1)
+
+    def forward(self, x):
+        x = self.resnet(x)
+        return torch.sigmoid(x)
+\end{python}
+
+Training the network for 500 epochs with a learning rate of 0.0001 resulted in
+an accuracy of 46.46\% on previously unseen test data.
+
+\includegraphics*[width=\textwidth]{Figures/ResNet50_classifier_0001.png}
+
+Training for 500 epochs with a learning rate of 0.001 resulted in an accuracy
+of 52.13\% on previously unseen test data.
+
+\includegraphics*[width=\textwidth]{Figures/ResNet50_classifier_LR001_chart.png}
+
+Training the model from scratch by setting pretrained=False, with a learning
+rate of 0.001 for 500 epochs resulted in an  accuracy of 49.15\% on previously
+unseen test data
+
+\includegraphics*[width=\textwidth]{Figures/ResNet50_untrained_LR001.png}
+
+Training the model from scratch, with a learning rate of 0.001 for 2000 epochs
+resulted in an accuracy of 51.64\% on previously unseen test data
+
+\includegraphics*[width=\textwidth]{Figures/ResNet50_untrain_LR001_2000.png}
 
 \section*{Implementing the pipeline}
 For this work, we reimplemented the pipeline proposed by
