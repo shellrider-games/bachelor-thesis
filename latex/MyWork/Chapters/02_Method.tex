@@ -25,6 +25,21 @@ interaction and hope to improve the believability of the animated results by not
 only classifying the skeleton type but also the subject class of the input
 sketch.
 
+In \textcite{10.1145/3592788} a system for automatically animating drawings of
+human figures is introduced. The system comprises of a figure detection step
+using Mask R-CNN \Textcite{he2018mask} to extract the figures' bounding box and
+utilises a pipeline of quantitisation, morphological closing, dilating,
+flood filling and retention of the largest remaining polygon for extracting the
+subject's mask. This gave more effective results than using Mask R-CNN for their
+usecase. We will investigate both apporaches for our work to decide which one we
+want to use for extracting masks for sketeches of quadrupeds. The introduced
+pipeline then uses a custom pose estimation model based on a ResNet-50 backbone
+to predict the current pose. The result of the pose estimation and masking
+process is used to generate a rigged model by using the predicted joint
+positions to determine the skeleton and assigning each triangle of the mesh to
+the bone, nearest to the triangle's centroid. For animating the pipeline uses
+motion captured data of human performers to retarget 3D motion to the 2D result.
+
 \section*{Training classification models}
 We used a subset of the dataset provided by \textcite{eitz2012hdhso} and
 \textcite{10.1145/2897824.2925954} to train our classification models.
