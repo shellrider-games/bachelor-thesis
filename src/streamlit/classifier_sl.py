@@ -10,15 +10,12 @@ WEIGHTS_PATH = 'weights.pth'
 def preprocess(image):
     preprocessed = cv2.resize(image, (128, 128))
     preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2GRAY)
-    _, preprocessed = cv2.threshold(preprocessed, 128, 255, cv2.THRESH_BINARY)
+    _, preprocessed = cv2.threshold(preprocessed, 127, 1, cv2.THRESH_BINARY)
+    preprocessed = preprocessed.astype(np.float32)
     return preprocessed
 
 def image_to_tensor(image):
-    if len(image.shape) == 2:
-        image = np.expand_dims(image, axis=2)
-    image = np.repeat(image, 3, axis=2)
-    tensor = torch.tensor(image, dtype=torch.float32).permute(2, 0, 1) / 255.0
-    tensor = tensor.unsqueeze(0)
+    tensor = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
     return tensor
 
 @st.cache_data
@@ -36,7 +33,7 @@ def predict(image, model):
         result = model(tensor)
     return result
 
-st.title("Cat or Dog | Sketch Classification")
+st.title("🐱 or 🐶 | Sketch Classification")
 input_file = st.file_uploader("Upload an image", type=["jpg", "png"])
 
 if input_file is not None:
@@ -46,11 +43,9 @@ if input_file is not None:
     st.image(img, caption='Uploaded Image', channels="BGR", use_column_width=True)
     
     preprocessed = preprocess(img)
-    
-    st.image(preprocessed, caption='Preprocessed Image', use_column_width=True)
-    
-    preprocessed_for_pred = np.expand_dims(preprocessed, axis=-1)
     model = load_model(WEIGHTS_PATH)
-    result = predict(preprocessed_for_pred, model)
-
-    st.write(f"Result: {result}")
+    result = predict(image_to_tensor(preprocessed), model)
+    result = result.squeeze().item()
+    emoji = "🐱" if result >= 0.5 else "🐶"
+    
+    st.header(f"I believe this sketch contains a {emoji}")
