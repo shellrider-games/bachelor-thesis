@@ -4,11 +4,13 @@ import cv2
 import numpy as np
 from torchvision import transforms
 from nn_model import EnhancedCNNMoreDropout
+from create_models import create_maskrcnn_resnet50_fpn
 
 WEIGHTS_PATH = 'weights.pth'
+MASK_R_CNN_PATH = 'mask_r_cnn_weights.pth'
 
-def preprocess(image):
-    preprocessed = cv2.resize(image, (128, 128))
+def preprocess(image, size = (128, 128)):
+    preprocessed = cv2.resize(image, size)
     preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2GRAY)
     _, preprocessed = cv2.threshold(preprocessed, 127, 1, cv2.THRESH_BINARY)
     preprocessed = preprocessed.astype(np.float32)
@@ -23,6 +25,14 @@ def load_model(path):
     weights = torch.load(path, map_location=torch.device('cpu'))
     model = EnhancedCNNMoreDropout()
     model.load_state_dict(weights)
+    model.eval()
+    return model
+
+@st.cache_data
+def load_mask_r_cnn(path):
+    weights = torch.load(path, map_location=torch.device('cpu'))
+    model = create_maskrcnn_resnet50_fpn()
+    model.load_state_dict(weights['state_dict'])
     model.eval()
     return model
 
@@ -49,3 +59,9 @@ if input_file is not None:
     emoji = "🐱" if result >= 0.5 else "🐶"
     
     st.header(f"I believe this sketch contains a {emoji}")
+
+    mask_r_cnn_model = load_mask_r_cnn(MASK_R_CNN_PATH)
+    mask_preprocessed_img = preprocess(img, (331, 331))
+    st.image(mask_preprocessed_img, caption='Preprocessed for MaskRCNN', use_column_width=True)
+    result = predict(image_to_tensor(mask_preprocessed_img), mask_r_cnn_model)[0]
+    st.write(result["boxes"])
