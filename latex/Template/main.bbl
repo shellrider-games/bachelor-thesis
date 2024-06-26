@@ -18,6 +18,82 @@
 
 
 \refsection{0}
+  \datalist[entry]{nyt/apasortcite//global/global}
+    \entry{kaley_match_2018}{online}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=26e27372c19668ba044d3671f438604d}{%
+           family={Kaley},
+           familyi={K\bibinitperiod},
+           given={Anna},
+           giveni={A\bibinitperiod},
+           givenun=0}}%
+      }
+      \list{language}{1}{%
+        {en}%
+      }
+      \strng{namehash}{26e27372c19668ba044d3671f438604d}
+      \strng{fullhash}{26e27372c19668ba044d3671f438604d}
+      \strng{bibnamehash}{26e27372c19668ba044d3671f438604d}
+      \strng{authorbibnamehash}{26e27372c19668ba044d3671f438604d}
+      \strng{authornamehash}{26e27372c19668ba044d3671f438604d}
+      \strng{authorfullhash}{26e27372c19668ba044d3671f438604d}
+      \field{sortinit}{K}
+      \field{sortinithash}{c02bf6bff1c488450c352b40f5d853ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{shorttitle}
+      \field{journaltitle}{Nielsen Norman Group}
+      \field{shorttitle}{Match {Between} {System} and {Real} {World}}
+      \field{title}{Match {Between} {System} and {Real} {World}: 2nd {Usability} {Heuristic} {Explained}}
+      \field{urlday}{24}
+      \field{urlmonth}{3}
+      \field{urlyear}{2019}
+      \field{year}{2018}
+      \field{dateera}{ce}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.nngroup.com/articles/match-system-real-world/
+      \endverb
+      \verb{url}
+      \verb https://www.nngroup.com/articles/match-system-real-world/
+      \endverb
+    \endentry
+    \entry{shneiderman_eyes_1996}{article}{}
+      \name{author}{1}{}{%
+        {{un=0,uniquepart=base,hash=39afccc0f55ae7821df79ffd677c90b0}{%
+           family={Shneiderman},
+           familyi={S\bibinitperiod},
+           given={Ben},
+           giveni={B\bibinitperiod},
+           givenun=0}}%
+      }
+      \strng{namehash}{39afccc0f55ae7821df79ffd677c90b0}
+      \strng{fullhash}{39afccc0f55ae7821df79ffd677c90b0}
+      \strng{bibnamehash}{39afccc0f55ae7821df79ffd677c90b0}
+      \strng{authorbibnamehash}{39afccc0f55ae7821df79ffd677c90b0}
+      \strng{authornamehash}{39afccc0f55ae7821df79ffd677c90b0}
+      \strng{authorfullhash}{39afccc0f55ae7821df79ffd677c90b0}
+      \field{sortinit}{S}
+      \field{sortinithash}{b164b07b29984b41daf1e85279fbc5ab}
+      \field{extradatescope}{labelyear}
+      \field{labeldatesource}{}
+      \true{uniqueprimaryauthor}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{shorttitle}
+      \field{journaltitle}{{IEEE} {Symposium} on {Visual} {Languages}, 1996. {Proceedings}}
+      \field{shorttitle}{The eyes have it}
+      \field{title}{The eyes have it: a task by data type taxonomy for information visualizations}
+      \field{year}{1996}
+      \field{dateera}{ce}
+      \field{pages}{336\bibrangedash 343}
+      \range{pages}{8}
+      \verb{doi}
+      \verb 10.1109/VL.1996.545307
+      \endverb
+    \endentry
+  \enddatalist
   \datalist[entry]{nyt/global//global/global}
     \entry{kaley_match_2018}{online}{}
       \name{author}{1}{}{%

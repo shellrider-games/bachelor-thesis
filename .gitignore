@@ -6,3 +6,4 @@ __pycache__/
 !latex/MyWork/Figures/*
 notebooks/sketchdetection/results/
 .ipynb_checkpoints/
+latex/

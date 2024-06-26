@@ -16,9 +16,30 @@ def preprocess(image, size = (128, 128)):
     preprocessed = preprocessed.astype(np.float32)
     return preprocessed
 
+def preprocess_for_mask_r_cnn(image, size = (331, 331)):
+    preprocessed = cv2.resize(image,size)
+    preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2GRAY)
+    return preprocessed
+    
+
 def image_to_tensor(image):
-    tensor = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
+    tensor = torch.tensor(image, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
     return tensor
+
+def draw_box_on_image(img, box):
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    x_min = int(box[0])
+    y_min = int(box[1])
+    x_max = int(box[2])
+    y_max = int(box[3])
+
+    img[y_min:y_max+1, x_min] = [255, 0, 0]
+    img[y_min:y_max+1, x_max] = [255, 0, 0]
+    img[y_min, x_min:x_max+1] = [255, 0, 0]
+    img[y_max, x_min:x_max+1] = [255, 0, 0]
+    return img
+
+
 
 @st.cache_data
 def load_model(path):
@@ -37,10 +58,9 @@ def load_mask_r_cnn(path):
     return model
 
 def predict(image, model):
-    tensor = image_to_tensor(image)
     model.eval()
     with torch.inference_mode():
-        result = model(tensor)
+        result = model(image)
     return result
 
 st.title("🐱 or 🐶 | Sketch Classification")
@@ -55,13 +75,19 @@ if input_file is not None:
     preprocessed = preprocess(img)
     model = load_model(WEIGHTS_PATH)
     result = predict(image_to_tensor(preprocessed), model)
+    
     result = result.squeeze().item()
     emoji = "🐱" if result >= 0.5 else "🐶"
     
     st.header(f"I believe this sketch contains a {emoji}")
 
     mask_r_cnn_model = load_mask_r_cnn(MASK_R_CNN_PATH)
-    mask_preprocessed_img = preprocess(img, (331, 331))
+    mask_preprocessed_img = preprocess_for_mask_r_cnn(img, (331, 331))
     st.image(mask_preprocessed_img, caption='Preprocessed for MaskRCNN', use_column_width=True)
-    result = predict(image_to_tensor(mask_preprocessed_img), mask_r_cnn_model)[0]
-    st.write(result["boxes"])
+
+    img_tensor = image_to_tensor(mask_preprocessed_img)
+    box = predict(img_tensor, mask_r_cnn_model)[0]["boxes"][0]
+
+    image_with_box = draw_box_on_image(mask_preprocessed_img, box)
+
+    st.image(image_with_box, caption="Detected Sketch", channels="RGB", use_column_width=True)
