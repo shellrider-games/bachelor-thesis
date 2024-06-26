@@ -19,6 +19,7 @@ def preprocess(image, size = (128, 128)):
 def preprocess_for_mask_r_cnn(image, size = (331, 331)):
     preprocessed = cv2.resize(image,size)
     preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2GRAY)
+    _, preprocessed = cv2.threshold(preprocessed, 127, 255, cv2.THRESH_BINARY)
     return preprocessed
     
 
