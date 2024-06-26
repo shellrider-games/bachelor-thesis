@@ -87,8 +87,15 @@ if input_file is not None:
     st.image(mask_preprocessed_img, caption='Preprocessed for MaskRCNN', use_column_width=True)
 
     img_tensor = image_to_tensor(mask_preprocessed_img)
-    box = predict(img_tensor, mask_r_cnn_model)[0]["boxes"][0]
+    result = predict(img_tensor, mask_r_cnn_model)
+    box = result[0]["boxes"][0]
+    mask = result[0]["masks"][0]
 
     image_with_box = draw_box_on_image(mask_preprocessed_img, box)
 
     st.image(image_with_box, caption="Detected Sketch", channels="RGB", use_column_width=True)
+
+    mask_image = np.transpose(mask.numpy(), (1,2,0))
+    _, mask_image = cv2.threshold(mask_image, 0.3, 1, cv2.THRESH_BINARY)
+
+    st.image(mask_image, use_column_width=True)
