@@ -15,12 +15,6 @@ def preprocess(image, size = (128, 128)):
     _, preprocessed = cv2.threshold(preprocessed, 127, 1, cv2.THRESH_BINARY)
     preprocessed = preprocessed.astype(np.float32)
     return preprocessed
-
-def preprocess_for_mask_r_cnn(image, size = (331, 331)):
-    preprocessed = cv2.resize(image,size)
-    preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2GRAY)
-    _, preprocessed = cv2.threshold(preprocessed, 127, 255, cv2.THRESH_BINARY)
-    return preprocessed
     
 
 def image_to_tensor(image):
@@ -28,7 +22,8 @@ def image_to_tensor(image):
     return tensor
 
 def draw_box_on_image(img, box):
-    img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB).astype(np.integer)
+    img *= 255
     x_min = int(box[0])
     y_min = int(box[1])
     x_max = int(box[2])
@@ -83,7 +78,7 @@ if input_file is not None:
     st.header(f"I believe this sketch contains a {emoji}")
 
     mask_r_cnn_model = load_mask_r_cnn(MASK_R_CNN_PATH)
-    mask_preprocessed_img = preprocess_for_mask_r_cnn(img, (331, 331))
+    mask_preprocessed_img = preprocess(img, (331, 331))
     st.image(mask_preprocessed_img, caption='Preprocessed for MaskRCNN', use_column_width=True)
 
     img_tensor = image_to_tensor(mask_preprocessed_img)
@@ -93,9 +88,10 @@ if input_file is not None:
 
     image_with_box = draw_box_on_image(mask_preprocessed_img, box)
 
+
     st.image(image_with_box, caption="Detected Sketch", channels="RGB", use_column_width=True)
 
     mask_image = np.transpose(mask.numpy(), (1,2,0))
-    _, mask_image = cv2.threshold(mask_image, 0.3, 1, cv2.THRESH_BINARY)
+    _, mask_image = cv2.threshold(mask_image, 0.5, 1, cv2.THRESH_BINARY)
 
     st.image(mask_image, use_column_width=True)
