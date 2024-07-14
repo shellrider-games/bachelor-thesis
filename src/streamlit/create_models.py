@@ -4,6 +4,7 @@ from torchvision.models.detection import MaskRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 import numpy as np
+import deeplab_resnet_sketchParse_r5 as sketch_parse
 
 def create_maskrcnn_resnet50_fpn():
     num_classes = 2 #Background and object
@@ -20,4 +21,8 @@ def create_maskrcnn_resnet50_fpn():
     hidden_layer = 256
     model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer, num_classes)
 
+    return model
+
+def create_resnet_sketch_parse_r5():
+    model = sketch_parse.Res_Deeplab()
     return model
