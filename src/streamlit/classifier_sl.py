@@ -5,6 +5,7 @@ import numpy as np
 from torchvision import transforms
 from nn_model import EnhancedCNNMoreDropout
 from create_models import create_maskrcnn_resnet50_fpn, create_resnet_sketch_parse_r5
+from masking import image_to_mask
 from scipy import ndimage
 from torch.autograd import Variable
 import torch
@@ -48,10 +49,18 @@ def draw_box_on_image(img, box):
 def cut_out_box(img, box):
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB).astype(np.uint8)
     img *= 255
-    x_min = int(box[0])
-    y_min = int(box[1])
-    x_max = int(box[2])
-    y_max = int(box[3])
+    x_min = int(box[0])-10
+    y_min = int(box[1])-10
+    x_max = int(box[2])+10
+    y_max = int(box[3])+10
+    if(x_min < 0):
+        x_min = 0
+    if(y_min < 0):
+        y_min = 0
+    if(x_max > img.shape[1]):
+        x_max = img.shape[1]
+    if(y_max > img.shape[0]):
+        y_max = img.shape[0]
     return img[y_min:y_max,x_min:x_max]
 
 
@@ -145,6 +154,9 @@ if input_file is not None:
     _, mask_image = cv2.threshold(mask_image, 0.5, 1, cv2.THRESH_BINARY)
 
     st.image(mask_image, caption="Detected Mask", use_column_width=True)
+
+    classical_masked_image = image_to_mask(cropped)
+    st.image(classical_masked_image,caption="Classical Mask", use_column_width=True)
 
     sketch_parse_model = load_sketch_parse_r5(SKETCH_PARSE_PATH)
 
