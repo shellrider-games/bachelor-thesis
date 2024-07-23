@@ -2,14 +2,13 @@ import streamlit as st
 import torch
 import cv2
 import numpy as np
-from torchvision import transforms
 from nn_model import EnhancedCNNMoreDropout
 from create_models import create_maskrcnn_resnet50_fpn, create_resnet_sketch_parse_r5
 from masking import image_to_mask
 from scipy import ndimage
 from torch.autograd import Variable
 import torch
-from torch import nn, device
+from torch import nn
 from create_skeleton import create_skeleton
 from skeletonization.bonetypes import common
 
@@ -128,6 +127,18 @@ def colour_segmented_image(image):
         rgb_image[image == value] = color
     return rgb_image
     
+def visualize_skeleton(mask_image,content_image , skeleton):
+    resized_preprocessed = cv2.resize(content_image,(mask_image.shape[1], mask_image.shape[0]))
+    skeleton_img = np.copy(mask_image)
+    skeleton_img = cv2.cvtColor(skeleton_img,cv2.COLOR_GRAY2RGB)
+    skeleton_img = skeleton_img * (resized_preprocessed*255)
+    for bone in skeleton.get_bones():
+        for point in bone[1]:
+            skeleton_img[int(point[1])][int(point[0])] = [255,0,0]
+    for joint in skeleton.joints:
+        cv2.circle(skeleton_img,(int(joint.position[0]),int(joint.position[1])),5,color=joint_type_to_color[joint.type],thickness=2)
+    return skeleton_img
+
 
 st.title("🐱 or 🐶 | Sketch Classification")
 input_file = st.file_uploader("Upload an image", type=["jpg", "png"])
@@ -179,16 +190,8 @@ if input_file is not None:
     st.write(":red[Head] :green[Body] :blue[Leg] :orange[Tail]")
 
     skeleton = create_skeleton(classical_masked_image, segment_image)
-    resized_preprocessed = cv2.resize(sketch_parse_preprocessed_img,(classical_masked_image.shape[1], classical_masked_image.shape[0]))
-    skeleton_img = np.copy(classical_masked_image)
-    skeleton_img = cv2.cvtColor(skeleton_img,cv2.COLOR_GRAY2RGB)
-    skeleton_img = skeleton_img * (resized_preprocessed*255) 
     
-    for bone in skeleton.get_bones():
-        for point in bone[1]:
-            skeleton_img[int(point[1])][int(point[0])] = [255,0,0]
-    for joint in skeleton.joints:
-        circle = cv2.circle(skeleton_img,(int(joint.position[0]),int(joint.position[1])),5,color=joint_type_to_color[joint.type],thickness=2)
-
-    
-    st.image(skeleton_img, caption="Image with skeleton", use_column_width=True)
+    st.image(visualize_skeleton(classical_masked_image,
+                                sketch_parse_preprocessed_img,
+                                skeleton),
+                        caption="Image with skeleton", use_column_width=True)
