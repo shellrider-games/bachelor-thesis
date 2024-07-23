@@ -1,0 +1,16 @@
+from skeletonization.skeletonizer import Skeletonizer
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+import matplotlib.patches as patches
+from skeletonization.bonetypes import common
+
+def create_skeleton(img, segmented_img):
+    img = ~img
+    img = cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+    skeletonizer = Skeletonizer(img)
+    skeleton = skeletonizer.skeletonize(30,3,10)
+    segmented_img = segmented_img.astype(np.uint8)
+    segmented_img = cv2.resize(segmented_img,(img.shape[1],img.shape[0]))
+    skeleton.identify(segmented_img)
+    return skeleton

@@ -10,10 +10,21 @@ from scipy import ndimage
 from torch.autograd import Variable
 import torch
 from torch import nn, device
+from create_skeleton import create_skeleton
+from skeletonization.bonetypes import common
 
 WEIGHTS_PATH = 'weights.pth'
 MASK_R_CNN_PATH = 'mask_r_cnn_weights.pth'
 SKETCH_PARSE_PATH = 'sketch_parse_weights.pth'
+
+joint_type_to_color = {
+    common.JointType.LIMB : (0,0,255),
+    common.JointType.BODY : (0,255,0),
+    common.JointType.HEAD : (255,0,0),
+    common.JointType.WING : (255,165,0),
+    common.JointType.MIXED : (255,0,255),
+    common.JointType.NONE : (0,255,255)
+}
 
 def preprocess(image, size = (128, 128)):
     preprocessed = cv2.resize(image, size)
@@ -164,6 +175,20 @@ if input_file is not None:
     st.image(sketch_parse_preprocessed_img, caption="Preprocessed for segmentation", use_column_width=True)
 
     segment_image = segment(sketch_parse_preprocessed_img, sketch_parse_model)
-    st.image(segment_image, caption="Segmented Image Data")
     st.image(colour_segmented_image(segment_image), caption="Segmented Image",use_column_width=True)
     st.write(":red[Head] :green[Body] :blue[Leg] :orange[Tail]")
+
+    skeleton = create_skeleton(classical_masked_image, segment_image)
+    resized_preprocessed = cv2.resize(sketch_parse_preprocessed_img,(classical_masked_image.shape[1], classical_masked_image.shape[0]))
+    skeleton_img = np.copy(classical_masked_image)
+    skeleton_img = cv2.cvtColor(skeleton_img,cv2.COLOR_GRAY2RGB)
+    skeleton_img = skeleton_img * (resized_preprocessed*255) 
+    
+    for bone in skeleton.get_bones():
+        for point in bone[1]:
+            skeleton_img[int(point[1])][int(point[0])] = [255,0,0]
+    for joint in skeleton.joints:
+        circle = cv2.circle(skeleton_img,(int(joint.position[0]),int(joint.position[1])),5,color=joint_type_to_color[joint.type],thickness=2)
+
+    
+    st.image(skeleton_img, caption="Image with skeleton", use_column_width=True)
