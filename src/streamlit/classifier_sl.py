@@ -9,8 +9,10 @@ from scipy import ndimage
 from torch.autograd import Variable
 import torch
 from torch import nn
-from create_skeleton import create_skeleton
+from create_skeleton import create_skeleton, create_quadruped_graph
 from skeletonization.bonetypes import common
+import networkx as nx
+from matplotlib import pyplot as plt
 
 WEIGHTS_PATH = 'weights.pth'
 MASK_R_CNN_PATH = 'mask_r_cnn_weights.pth'
@@ -139,6 +141,31 @@ def visualize_skeleton(mask_image,content_image , skeleton):
         cv2.circle(skeleton_img,(int(joint.position[0]),int(joint.position[1])),5,color=joint_type_to_color[joint.type],thickness=2)
     return skeleton_img
 
+def get_color_map(graph):
+        colors = ['green', 'red', 'green', 'blue', 'orange']
+        color_map = []
+        for _, attr in graph.nodes(data=True):
+            color_map.append(colors[int(attr['type'])])
+        return color_map
+
+def draw_skeleton_graph(graph):
+    color_map = get_color_map(graph)
+    fig, ax = plt.subplots()
+    pos = nx.get_node_attributes(graph, 'pos')
+    nx.draw(graph,pos, node_color=color_map)
+    st.pyplot(fig)
+
+def draw_reference_and_skeleton(reference_graph, graph):
+    reference_color_map = get_color_map(reference_graph)
+    color_map = get_color_map(graph)
+    fig, (ax1, ax2) = plt.subplots(1,2)
+    pos1 = nx.get_node_attributes(reference_graph, 'pos')
+    pos2 = nx.get_node_attributes(graph, 'pos')
+
+    nx.draw(reference_graph, pos1, node_color=reference_color_map,ax=ax1)
+    nx.draw(graph, pos2, node_color=color_map,ax=ax2)
+    st.pyplot(fig)
+
 
 st.title("🐱 or 🐶 | Sketch Classification")
 input_file = st.file_uploader("Upload an image", type=["jpg", "png"])
@@ -195,3 +222,11 @@ if input_file is not None:
                                 sketch_parse_preprocessed_img,
                                 skeleton),
                         caption="Image with skeleton", use_column_width=True)
+    skeleton.normalize_and_flip_positions()
+    skeleton_graph = skeleton.to_network_x()
+    st.markdown("skeleton as network(x) graph")
+    draw_skeleton_graph(skeleton_graph)
+    quadruped_graph = create_quadruped_graph()
+    st.markdown("Quadruped reference skeleton as network(x) graph")
+    draw_skeleton_graph(quadruped_graph)
+    draw_reference_and_skeleton(quadruped_graph,skeleton_graph)

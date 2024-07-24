@@ -136,7 +136,7 @@ class Skeleton:
             else:
                 bone.type = BoneType.MIXED
 
-    def normalize_positions(self, toInt: bool):
+    def normalize_positions(self, toInt: bool = False):
         """
         @brief Normalizes the joint positions to [0, 1] interval
         @param toInt If true, it will approximate the interval [0, 1] to [0, 100] interval
@@ -157,6 +157,12 @@ class Skeleton:
             if toInt:
                 joint.position[0] *= 100
                 joint.position[1] *= 100
+
+    def normalize_and_flip_positions(self, toInt:bool = False):
+        self.normalize_positions(toInt)
+        for joint in self.joints:
+            joint.position[1] = 1 - joint.position[1]
+
 
     def to_network_x(self) -> nx.Graph:
         """
