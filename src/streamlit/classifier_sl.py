@@ -225,6 +225,7 @@ if input_file is not None:
     
     skeleton.normalize_and_flip_positions()
     skeleton_graph = skeleton.to_network_x()
+    skeleton_graph.remove_edges_from(nx.selfloop_edges(skeleton_graph))
     draw_skeleton_graph(skeleton_graph)
     quadruped_graph = create_quadruped_graph()
     draw_skeleton_graph(quadruped_graph)
