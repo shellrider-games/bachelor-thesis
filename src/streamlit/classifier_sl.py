@@ -222,11 +222,10 @@ if input_file is not None:
                                 sketch_parse_preprocessed_img,
                                 skeleton),
                         caption="Image with skeleton", use_column_width=True)
+    
     skeleton.normalize_and_flip_positions()
     skeleton_graph = skeleton.to_network_x()
-    st.markdown("skeleton as network(x) graph")
     draw_skeleton_graph(skeleton_graph)
     quadruped_graph = create_quadruped_graph()
-    st.markdown("Quadruped reference skeleton as network(x) graph")
     draw_skeleton_graph(quadruped_graph)
     draw_reference_and_skeleton(quadruped_graph,skeleton_graph)
