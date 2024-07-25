@@ -182,6 +182,21 @@ class Skeleton:
             if bone.is_made(u, v):
                 return skeleton
         raise Exception("no bone with these ids ({}, {}) exists".format(u, v))
+    
+    def find_endpoints(self) -> list:
+        """
+        @brief Find endpoints in the skeleton
+        @return List of endpoint joint IDs
+        """
+        endpoint_ids = []
+        for joint in self.joints:
+            connected_bones = 0
+            for bone in self.bones:
+                if joint.id in bone.attached_joints:
+                    connected_bones += 1
+            if connected_bones == 1:
+                endpoint_ids.append(joint.id)
+        return endpoint_ids
 
 
 class Skeletonizer:
