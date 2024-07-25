@@ -213,6 +213,7 @@ if input_file is not None:
     st.image(sketch_parse_preprocessed_img, caption="Preprocessed for segmentation", use_column_width=True)
 
     segment_image = segment(sketch_parse_preprocessed_img, sketch_parse_model)
+    st.image(segment_image)
     st.image(colour_segmented_image(segment_image), caption="Segmented Image",use_column_width=True)
     st.write(":red[Head] :green[Body] :blue[Leg] :orange[Tail]")
 
