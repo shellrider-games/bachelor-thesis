@@ -213,7 +213,7 @@ class Skeleton:
                 endpoint_ids.append(joint.id)
         return endpoint_ids
     
-    def order_endpoints(self, endpoints) -> list:
+    def order_points(self, endpoints) -> list:
         """
         Order the endpoints along the contour in a clockwise direction.
         """
