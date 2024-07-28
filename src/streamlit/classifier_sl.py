@@ -295,4 +295,5 @@ if input_file is not None:
     st.pyplot(fig)
     
     model_file = generate_mesh(classical_masked_image,0.05)
+    st.write("Model file is ready to download")
     st.download_button('Download OBJ', model_file, file_name="model.obj", mime='text/obj')
