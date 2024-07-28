@@ -297,3 +297,8 @@ if input_file is not None:
     model_file = generate_mesh(classical_masked_image,0.05)
     st.write("Model file is ready to download")
     st.download_button('Download OBJ', model_file, file_name="model.obj", mime='text/obj')
+
+    skeleton_graph = proto_skeleton.to_network_x()
+    positions = nx.get_node_attributes(skeleton_graph, 'pos') 
+    for val in positions:
+        print(positions[val])
