@@ -158,6 +158,11 @@ class Skeleton:
                 joint.position[0] *= 100
                 joint.position[1] *= 100
 
+    def normalize_and_flip_positions(self, toInt:bool = False):
+        self.normalize_positions(toInt)
+        for joint in self.joints:
+            joint.position[1] = 1 - joint.position[1]
+
     def to_network_x(self) -> nx.Graph:
         """
         @brief Creates an networkX graph from the skeleton

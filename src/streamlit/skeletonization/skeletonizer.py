@@ -190,6 +190,44 @@ class Skeleton:
         raise Exception("no bone with these ids ({}, {}) exists".format(u, v))
 
 
+    def find_points_to_remove(self) -> list:
+        """
+        @brief Find all non endpoints in the skeleton
+        @return List of non enpoint joint IDs
+        """
+        ids = []
+        for joint in self.joints:
+            connected_bones = 0
+            for bone in self.bones:
+                if joint.id in bone.attached_joints:
+                    connected_bones += 1
+            if connected_bones != 1:
+                ids.append(joint.id)
+        return ids
+    
+    def find_endpoints(self) -> list:
+        """
+        @brief Find endpoints in the skeleton
+        @return List of endpoint joint IDs
+        """
+        endpoint_ids = []
+        for joint in self.joints:
+            connected_bones = 0
+            for bone in self.bones:
+                if joint.id in bone.attached_joints:
+                    connected_bones += 1
+            if connected_bones == 1:
+                endpoint_ids.append(joint.id)
+        return endpoint_ids
+    
+    def order_points(self, endpoints) -> list:
+        """
+        Order the endpoints along the contour in a clockwise direction.
+        """
+        center = np.mean([self.joints[ep].position for ep in endpoints], axis=0)
+        ordered_endpoints = sorted(endpoints, key=lambda ep: np.arctan2(self.joints[ep].position[1] - center[1], self.joints[ep].position[0] - center[0]))
+        return ordered_endpoints
+
 class Skeletonizer:
     """
     @brief Class for skeletonizing sketches.

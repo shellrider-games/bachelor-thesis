@@ -9,14 +9,20 @@ from scipy import ndimage
 from torch.autograd import Variable
 import torch
 from torch import nn
-from create_skeleton import create_skeleton, create_quadruped_graph
+from create_skeleton import create_skeleton
 from skeletonization.bonetypes import common
 import networkx as nx
 from matplotlib import pyplot as plt
+import copy
+from skeletonmatching.skeleton_path import match
+import matplotlib.patheffects as path_effects
+from meshing.meshing import generate_mesh
 
 WEIGHTS_PATH = 'weights.pth'
 MASK_R_CNN_PATH = 'mask_r_cnn_weights.pth'
 SKETCH_PARSE_PATH = 'sketch_parse_weights.pth'
+CAT_PROTOTYPE_PATH = 'cat_proto_mask.jpg'
+CAT_PROTOTYPE_SEGMENTATION_PATH = 'cat_proto_segment.jpg'
 
 joint_type_to_color = {
     common.JointType.LIMB : (0,0,255),
@@ -58,13 +64,13 @@ def draw_box_on_image(img, box):
     img[y_max, x_min:x_max+1] = [255, 0, 0]
     return img
 
-def cut_out_box(img, box):
+def cut_out_box(img, box, margin):
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB).astype(np.uint8)
     img *= 255
-    x_min = int(box[0])-10
-    y_min = int(box[1])-10
-    x_max = int(box[2])+10
-    y_max = int(box[3])+10
+    x_min = int(box[0])-margin
+    y_min = int(box[1])-margin
+    x_max = int(box[2])+margin
+    y_max = int(box[3])+margin
     if(x_min < 0):
         x_min = 0
     if(y_min < 0):
@@ -111,10 +117,11 @@ def segment(image, model):
     with torch.no_grad():
         result = model([Variable(torch.from_numpy(image[np.newaxis,:].transpose(0,3,1,2)).float()),0])
     interp = nn.UpsamplingBilinear2d(size=(321,321))
+    pose = np.argmax(result[4])
     output = interp(result[3]).cpu().data[0].numpy()
     output = output.transpose(1, 2, 0)
     output = np.argmax(output, axis=2)
-    return output
+    return output, pose
 
 def colour_segmented_image(image):
     colors = {
@@ -195,7 +202,7 @@ if input_file is not None:
     mask = result[0]["masks"][0]
 
     image_with_box = draw_box_on_image(mask_preprocessed_img, box)
-    cropped = cut_out_box(mask_preprocessed_img, box)
+    cropped = cut_out_box(mask_preprocessed_img, box, 25)
 
     st.image(image_with_box, caption="Detected Sketch", channels="RGB", use_column_width=True)
 
@@ -212,10 +219,19 @@ if input_file is not None:
     sketch_parse_preprocessed_img = preprocess_for_sketch_parse(cropped)
     st.image(sketch_parse_preprocessed_img, caption="Preprocessed for segmentation", use_column_width=True)
 
-    segment_image = segment(sketch_parse_preprocessed_img, sketch_parse_model)
-    st.image(segment_image)
+    segment_image, estimated_pose = segment(sketch_parse_preprocessed_img, sketch_parse_model)
     st.image(colour_segmented_image(segment_image), caption="Segmented Image",use_column_width=True)
     st.write(":red[Head] :green[Body] :blue[Leg] :orange[Tail]")
+    print(estimated_pose)
+
+    pose_text = "west" if estimated_pose == 1 or estimated_pose == 2 or estimated_pose == 4 or estimated_pose == 7 else "east"
+    st.write(f"Estimated subject to be looking {pose_text}")
+
+    if(pose_text == "west"):
+        segment_image = cv2.flip(segment_image, 1)
+        classical_masked_image = cv2.flip(classical_masked_image,1)
+        sketch_parse_preprocessed_img = cv2.flip(sketch_parse_preprocessed_img, 1)
+
 
     skeleton = create_skeleton(classical_masked_image, segment_image)
     
@@ -224,10 +240,59 @@ if input_file is not None:
                                 skeleton),
                         caption="Image with skeleton", use_column_width=True)
     
-    skeleton.normalize_and_flip_positions()
-    skeleton_graph = skeleton.to_network_x()
+    skeleton_copy = copy.deepcopy(skeleton)
+
+    skeleton_copy.normalize_and_flip_positions()
+    skeleton_graph = skeleton_copy.to_network_x()
     skeleton_graph.remove_edges_from(nx.selfloop_edges(skeleton_graph))
     draw_skeleton_graph(skeleton_graph)
-    quadruped_graph = create_quadruped_graph()
-    draw_skeleton_graph(quadruped_graph)
-    draw_reference_and_skeleton(quadruped_graph,skeleton_graph)
+
+    prototype_img = cv2.imread(CAT_PROTOTYPE_PATH, cv2.IMREAD_GRAYSCALE)
+    prototype_segmented_img = cv2.imread(CAT_PROTOTYPE_SEGMENTATION_PATH,cv2.IMREAD_GRAYSCALE)
+    st.image(prototype_img, caption="Prototype mask", use_column_width=True)
+
+    proto_skeleton = create_skeleton(prototype_img,prototype_segmented_img)
+    st.image(visualize_skeleton(prototype_img,
+                                cv2.cvtColor(np.zeros_like(prototype_img), cv2.COLOR_GRAY2RGB) ,
+                                proto_skeleton),
+                        caption="Prototype with skeleton", use_column_width=True)
+    
+    
+    subject_distance_transfrom = ndimage.distance_transform_edt(classical_masked_image)
+    subject_normalizer_dt = 1 / (sum(sum(subject_distance_transfrom))/2)
+    normalized_subject_distance_transform = subject_distance_transfrom * subject_normalizer_dt
+
+    prototype_distance_transfrom = ndimage.distance_transform_edt(prototype_img)
+    prototype_normalizer_dt = 1 / (sum(sum(prototype_distance_transfrom))/2)
+    normalized_prototype_distance_transform = prototype_distance_transfrom * prototype_normalizer_dt
+
+    fig, axs = plt.subplots(ncols=2)
+    fig.suptitle("normalized distance transforms")
+    axs[1].imshow(normalized_subject_distance_transform*1000, cmap="viridis")
+    axs[0].imshow(normalized_prototype_distance_transform*1000, cmap="viridis")
+    st.pyplot(fig)
+
+    matched_joints = match(skeleton,~classical_masked_image,proto_skeleton,~prototype_img)
+
+    fig, axs = plt.subplots(1,2)
+    fig.suptitle("Matching between prototype and subject")
+    axs[0].imshow(visualize_skeleton(prototype_img,
+                            cv2.cvtColor(np.zeros_like(prototype_img), cv2.COLOR_GRAY2RGB) ,
+                            proto_skeleton))
+    axs[1].imshow(visualize_skeleton(classical_masked_image,
+                                sketch_parse_preprocessed_img,
+                                skeleton))
+    axs[0].set_title("Prototype skeleton")
+    axs[1].set_title("subject")
+    idx = 0
+    for a,b in matched_joints:
+        txt1 = axs[0].text(b.position[0], b.position[1], f'J{idx+1}', color='white', fontsize=12, ha='right')
+        txt2 = axs[1].text(a.position[0], a.position[1], f'J{idx+1}', color='white', fontsize=12, ha='right')
+        outline_effect = [path_effects.Stroke(linewidth=3, foreground='black'), path_effects.Normal()]
+        txt1.set_path_effects(outline_effect)
+        txt2.set_path_effects(outline_effect)
+        idx +=1
+    st.pyplot(fig)
+    
+    model_file = generate_mesh(classical_masked_image,0.05)
+    st.download_button('Download OBJ', model_file, file_name="model.obj", mime='text/obj')
