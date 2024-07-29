@@ -149,7 +149,7 @@ def visualize_skeleton(mask_image,content_image , skeleton):
     return skeleton_img
 
 def get_color_map(graph):
-        colors = ['green', 'red', 'green', 'blue', 'orange']
+        colors = ['magenta', 'red', 'green', 'blue', 'orange']
         color_map = []
         for _, attr in graph.nodes(data=True):
             color_map.append(colors[int(attr['type'])])
