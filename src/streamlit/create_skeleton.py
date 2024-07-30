@@ -1,10 +1,6 @@
 from skeletonization.skeletonizer import Skeletonizer
 import numpy as np
 import cv2
-from matplotlib import pyplot as plt
-import matplotlib.patches as patches
-from skeletonization.bonetypes import common
-import networkx as nx
 
 def create_skeleton(img, segmented_img):
     img = ~img

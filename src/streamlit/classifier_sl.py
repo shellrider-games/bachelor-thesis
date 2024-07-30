@@ -216,8 +216,7 @@ if input_file is not None:
     sketch_parse_model = load_sketch_parse_r5(SKETCH_PARSE_PATH)
 
     sketch_parse_preprocessed_img = preprocess_for_sketch_parse(cropped)
-    st.image(sketch_parse_preprocessed_img, caption="Preprocessed for segmentation", use_column_width=True)
-
+ 
     segment_image, estimated_pose = segment(sketch_parse_preprocessed_img, sketch_parse_model)
     st.image(colour_segmented_image(segment_image), caption="Segmented Image",use_column_width=True)
     st.write(":red[Head] :green[Body] :blue[Leg] :orange[Tail]")
@@ -233,6 +232,10 @@ if input_file is not None:
 
 
     skeleton = create_skeleton(classical_masked_image, segment_image)
+    st.image(visualize_skeleton(classical_masked_image,
+                                sketch_parse_preprocessed_img,
+                                skeleton),
+                        caption="Image with skeleton", use_column_width=True)
     skeleton.prune_end_effectors()
     skeleton.prune_bones_without_joints()
 
@@ -246,6 +249,7 @@ if input_file is not None:
     st.image(prototype_img, caption="Prototype mask", use_column_width=True)
 
     proto_skeleton = create_skeleton(prototype_img,prototype_segmented_img)
+
     proto_skeleton.prune_end_effectors()
     skeleton.prune_bones_without_joints()
     st.image(visualize_skeleton(prototype_img,
