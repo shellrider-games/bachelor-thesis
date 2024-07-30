@@ -142,7 +142,7 @@ def visualize_skeleton(mask_image,content_image , skeleton):
     skeleton_img = cv2.cvtColor(skeleton_img,cv2.COLOR_GRAY2RGB)
     skeleton_img = skeleton_img * (resized_preprocessed*255)
     for bone in skeleton.get_bones():
-        for point in bone[1]:
+        for point in bone.path:
             skeleton_img[int(point[1])][int(point[0])] = [255,0,0]
     for joint in skeleton.joints:
         cv2.circle(skeleton_img,(int(joint.position[0]),int(joint.position[1])),5,color=joint_type_to_color[joint.type],thickness=2)

@@ -6,14 +6,13 @@ import networkx as nx
 from skeletonization.bonetypes.common import JointType, BoneType
 from skeletonization.helper.ussr import USSR
 from skeletonization.helper.voronoi_skeleton import skeletonize
-from matplotlib import pyplot as plt
 
 class Bone:
     """
     @brief Class representing a Bone.
     """
 
-    def __init__(self, id: int, type: BoneType, id_j1: int, id_j2: int):
+    def __init__(self, id: int, type: BoneType, id_j1: int, id_j2: int, path: list):
         """
         @brief Constructor
         @param id ID of the bone
@@ -24,6 +23,7 @@ class Bone:
         self.id = id
         self.type = type
         self.attached_joints = [id_j1, id_j2]
+        self.path = path
 
     def __str__(self):
         return "bone({}, {}, {} -> {})".format(self.id, self.type, self.attached_joints[0], self.attached_joints[1])
@@ -59,7 +59,6 @@ class Skeleton:
         @brief Default Constructor
         """
         self.bones = []
-        self.skeleton_path = []
         self.joints = []
         pass
 
@@ -116,9 +115,8 @@ class Skeleton:
         b_id = self.__bone_index(id_j1, id_j2)
         if b_id != -1:
             return b_id
-        b = Bone(len(self.bones), BoneType.NONE, id_j1, id_j2)
+        b = Bone(len(self.bones), BoneType.NONE, id_j1, id_j2, path)
         self.bones.append(b)
-        self.skeleton_path.append(path)
         return b.id
 
     def identify(self, segmented_image):
@@ -178,15 +176,15 @@ class Skeleton:
         return graph
 
     def get_bones(self):
-        return list(zip(self.bones, self.skeleton_path))
+        return self.bones
 
     def get_joint(self, id: int):
         return self.joints[id]
 
     def get_skeleton_path(self, u: int, v: int):
-        for bone, skeleton in self.get_bones():
+        for bone in self.get_bones():
             if bone.is_made(u, v):
-                return skeleton
+                return bone.path
         raise Exception("no bone with these ids ({}, {}) exists".format(u, v))
 
 
