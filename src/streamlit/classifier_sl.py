@@ -156,10 +156,9 @@ def get_color_map(graph):
         return color_map
 
 def draw_skeleton_graph(graph):
-    color_map = get_color_map(graph)
     fig, ax = plt.subplots()
     pos = nx.get_node_attributes(graph, 'pos')
-    nx.draw(graph,pos, node_color=color_map)
+    nx.draw(graph,pos)
     st.pyplot(fig)
 
 def draw_reference_and_skeleton(reference_graph, graph):
@@ -234,24 +233,21 @@ if input_file is not None:
 
 
     skeleton = create_skeleton(classical_masked_image, segment_image)
-    
+    skeleton.prune_end_effectors()
+    skeleton.prune_bones_without_joints()
+
     st.image(visualize_skeleton(classical_masked_image,
                                 sketch_parse_preprocessed_img,
                                 skeleton),
                         caption="Image with skeleton", use_column_width=True)
     
-    skeleton_copy = copy.deepcopy(skeleton)
-
-    skeleton_copy.normalize_and_flip_positions()
-    skeleton_graph = skeleton_copy.to_network_x()
-    skeleton_graph.remove_edges_from(nx.selfloop_edges(skeleton_graph))
-    draw_skeleton_graph(skeleton_graph)
-
     prototype_img = cv2.imread(CAT_PROTOTYPE_PATH, cv2.IMREAD_GRAYSCALE)
     prototype_segmented_img = cv2.imread(CAT_PROTOTYPE_SEGMENTATION_PATH,cv2.IMREAD_GRAYSCALE)
     st.image(prototype_img, caption="Prototype mask", use_column_width=True)
 
     proto_skeleton = create_skeleton(prototype_img,prototype_segmented_img)
+    proto_skeleton.prune_end_effectors()
+    skeleton.prune_bones_without_joints()
     st.image(visualize_skeleton(prototype_img,
                                 cv2.cvtColor(np.zeros_like(prototype_img), cv2.COLOR_GRAY2RGB) ,
                                 proto_skeleton),

@@ -70,7 +70,7 @@ def match(skeleton, img, proto_skeleton, prototype_img):
     num_dummy_nodes = max(0, num_subject_end_nodes - num_prototype_end_nodes)
 
 
-    alpha = 0.1
+    alpha = 0.01
 
     matrix = np.zeros((num_subject_end_nodes + 1, num_prototype_end_nodes + num_dummy_nodes + 1))
     i = 0

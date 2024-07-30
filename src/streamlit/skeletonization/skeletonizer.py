@@ -102,6 +102,48 @@ class Skeleton:
         j = Joint(len(self.joints), JointType.NONE, position)
         self.joints.append(j)
         return j.id
+    
+    def remove_joint(self, id : int):
+        joint = next((j for j in self.joints if j.id == id), None)
+        if joint != None:
+            bones = []
+            for bone in self.get_bones():
+                if joint.id in bone.attached_joints:
+                    bones.append(bone)
+            for bone in bones:
+                self.bones.remove(bone)
+            self.joints.remove(joint)
+
+    def prune_end_effectors(self):
+        marked_for_remove = []
+        for joint in self.joints:
+            if joint.type == JointType.BODY:
+                continue
+            number_connected_bones = []
+            for bone in self.bones:
+                if joint.id in bone.attached_joints:
+                    number_connected_bones.append(bone)
+            if len(number_connected_bones) == 1:
+                print("Found end effector")
+                joints = number_connected_bones[0].attached_joints
+                if self.get_joint(joints[0]).type == self.get_joint(joints[1]).type:
+                    marked_for_remove.append(joint)
+        if len(marked_for_remove) > 0:
+            for joint in marked_for_remove:
+                self.remove_joint(joint.id)
+            self.prune_end_effectors()
+
+    def prune_bones_without_joints(self):
+        marked_for_remove = []
+        for bone in self.bones:
+            for joint in bone.attached_joints:
+                if self.get_joint(joint) == None:
+                    marked_for_remove.append(bone)
+            if bone.attached_joints[0] == bone.attached_joints[1]:
+                marked_for_remove.append(bone)
+
+        for bone in marked_for_remove:
+            self.bones.remove(bone)
 
     def add_bone(self, id_j1: int, id_j2: int, path=None) -> int:
         """
@@ -179,7 +221,7 @@ class Skeleton:
         return self.bones
 
     def get_joint(self, id: int):
-        return self.joints[id]
+        return next((j for j in self.joints if j.id == id), None)
 
     def get_skeleton_path(self, u: int, v: int):
         for bone in self.get_bones():
@@ -222,8 +264,8 @@ class Skeleton:
         """
         Order the endpoints along the contour in a clockwise direction.
         """
-        center = np.mean([self.joints[ep].position for ep in endpoints], axis=0)
-        ordered_endpoints = sorted(endpoints, key=lambda ep: np.arctan2(self.joints[ep].position[1] - center[1], self.joints[ep].position[0] - center[0]))
+        center = np.mean([self.get_joint(ep).position for ep in endpoints], axis=0)
+        ordered_endpoints = sorted(endpoints, key=lambda ep: np.arctan2(self.get_joint(ep).position[1] - center[1], self.get_joint(ep).position[0] - center[0]))
         return ordered_endpoints
 
 class Skeletonizer:
