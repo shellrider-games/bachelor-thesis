@@ -83,15 +83,12 @@ def cut_out_box(img, box, margin):
 
 def cut_out_box_on_original(img, box, margin, original):
     original = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
-    factor = (original.shape[0]/img.shape[0],original.shape[1]/img.shape[1])
-    x_min = int(box[0])-margin
-    y_min = int(box[1])-margin
-    x_max = int(box[2])+margin
-    y_max = int(box[3])+margin
-    x_min = int(factor[0]*x_min)
-    y_min = int(factor[1]*y_min)
-    x_max = int(factor[0]*x_max)
-    y_max = int(factor[1]*y_max)
+    factor = (original.shape[1]/img.shape[1],original.shape[0]/img.shape[0])
+    x_min = int((box[0]-margin)*factor[0])
+    y_min = int((box[1]-margin)*factor[1])
+    x_max = int((box[2]+margin)*factor[0])
+    y_max = int((box[3]+margin)*factor[1])
+                
     if(x_min < 0):
         x_min = 0
     if(y_min < 0):
