@@ -2,7 +2,7 @@ import streamlit as st
 import torch
 import cv2
 import numpy as np
-from nn_model import EnhancedCNNMoreDropout
+from nn_model import EnhancedCNNMoreDropout, DeepSketch
 from create_models import create_maskrcnn_resnet50_fpn, create_resnet_sketch_parse_r5
 from masking import image_to_mask
 from scipy import ndimage
@@ -18,7 +18,7 @@ from skeletonmatching.skeleton_path import match
 import matplotlib.patheffects as path_effects
 from meshing.meshing import generate_mesh
 
-WEIGHTS_PATH = 'weights.pth'
+WEIGHTS_PATH = 'classifier_deep_sketch_weights_200.pth'
 MASK_R_CNN_PATH = 'mask_r_cnn_weights.pth'
 SKETCH_PARSE_PATH = 'sketch_parse_weights.pth'
 CAT_PROTOTYPE_PATH = 'cat_proto_mask.jpg'
@@ -81,11 +81,32 @@ def cut_out_box(img, box, margin):
         y_max = img.shape[0]
     return img[y_min:y_max,x_min:x_max]
 
+def cut_out_box_on_original(img, box, margin, original):
+    original = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
+    factor = (original.shape[0]/img.shape[0],original.shape[1]/img.shape[1])
+    x_min = int(box[0])-margin
+    y_min = int(box[1])-margin
+    x_max = int(box[2])+margin
+    y_max = int(box[3])+margin
+    x_min = int(factor[0]*x_min)
+    y_min = int(factor[1]*y_min)
+    x_max = int(factor[0]*x_max)
+    y_max = int(factor[1]*y_max)
+    if(x_min < 0):
+        x_min = 0
+    if(y_min < 0):
+        y_min = 0
+    if(x_max > original.shape[1]):
+        x_max = original.shape[1]
+    if(y_max > original.shape[0]):
+        y_max = original.shape[0]
+    return original[y_min:y_max,x_min:x_max]
+
 
 @st.cache_data
 def load_model(path):
     weights = torch.load(path, map_location=torch.device('cpu'))
-    model = EnhancedCNNMoreDropout()
+    model = DeepSketch()
     model.load_state_dict(weights)
     model.eval()
     return model
@@ -179,12 +200,18 @@ input_file = st.file_uploader("Upload an image", type=["jpg", "png"])
 if input_file is not None:
     file_bytes = np.asarray(bytearray(input_file.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    original = img.copy()
     
     st.image(img, caption='Uploaded Image', channels="BGR", use_column_width=True)
-    
+
     preprocessed = preprocess(img)
+    preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_GRAY2RGB)
     model = load_model(WEIGHTS_PATH)
-    result = predict(image_to_tensor(preprocessed), model)
+    tensor = image_to_tensor(preprocessed)
+    tensor = tensor.squeeze(1)
+    tensor = tensor.permute(0, 3, 1, 2)
+
+    result = predict(tensor, model)
     
     result = result.squeeze().item()
     emoji = "🐱" if result >= 0.5 else "🐶"
@@ -202,20 +229,39 @@ if input_file is not None:
 
     image_with_box = draw_box_on_image(mask_preprocessed_img, box)
     cropped = cut_out_box(mask_preprocessed_img, box, 25)
+    cropped_from_orig = cut_out_box_on_original(mask_preprocessed_img, box, 25,original)
 
     st.image(image_with_box, caption="Detected Sketch", channels="RGB", use_column_width=True)
+    
+    st.image(cropped_from_orig, caption="Cropped from input", use_column_width=True)
 
     mask_image = np.transpose(mask.numpy(), (1,2,0))
     _, mask_image = cv2.threshold(mask_image, 0.5, 1, cv2.THRESH_BINARY)
 
     st.image(mask_image, caption="Detected Mask", use_column_width=True)
 
-    classical_masked_image = image_to_mask(cropped)
+    classical_masked_image = image_to_mask(cropped_from_orig)
+
+    longer_side_length = 331
+
+    height, width = classical_masked_image.shape[:2]
+
+    aspect_ratio = width / height
+
+    if width > height:
+        new_width = longer_side_length
+        new_height = int(new_width / aspect_ratio)
+    else:
+        new_height = longer_side_length
+        new_width = int(new_height * aspect_ratio)
+
+    classical_masked_image = cv2.resize(classical_masked_image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+
     st.image(classical_masked_image,caption="Classical Mask", use_column_width=True)
 
     sketch_parse_model = load_sketch_parse_r5(SKETCH_PARSE_PATH)
 
-    sketch_parse_preprocessed_img = preprocess_for_sketch_parse(cropped)
+    sketch_parse_preprocessed_img = preprocess_for_sketch_parse(cropped_from_orig)
  
     segment_image, estimated_pose = segment(sketch_parse_preprocessed_img, sketch_parse_model)
     st.image(colour_segmented_image(segment_image), caption="Segmented Image",use_column_width=True)
