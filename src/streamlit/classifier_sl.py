@@ -337,11 +337,16 @@ if input_file is not None:
         idx +=1
     st.pyplot(fig)
     
-    model_file = generate_mesh(classical_masked_image,0.05)
-    st.write("Model file is ready to download")
-    st.download_button('Download OBJ', model_file, file_name="model.obj", mime='text/obj')
-
     skeleton_graph = proto_skeleton.to_network_x()
     positions = nx.get_node_attributes(skeleton_graph, 'pos') 
     for val in positions:
         print(positions[val])
+
+    mesh_file_name = generate_mesh(classical_masked_image)
+    st.write("generated_mesh")
+    with open (mesh_file_name, "rb") as file:
+        btn = st.download_button(
+            label="Download mesh",
+            data = file,
+            file_name="mesh.gltf"
+        )
