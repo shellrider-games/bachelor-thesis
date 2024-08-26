@@ -124,7 +124,6 @@ class Skeleton:
                 if joint.id in bone.attached_joints:
                     number_connected_bones.append(bone)
             if len(number_connected_bones) == 1:
-                print("Found end effector")
                 joints = number_connected_bones[0].attached_joints
                 if self.get_joint(joints[0]).type == self.get_joint(joints[1]).type:
                     marked_for_remove.append(joint)

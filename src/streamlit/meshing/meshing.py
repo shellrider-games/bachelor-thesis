@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pygltflib
 import base64
+import networkx as nx
 
 def interpolate(v1, v2, val1, val2):
     if val1 != val2:
@@ -47,16 +48,10 @@ def marching_squares(image):
                     faces.append(face_vertices[i:i+3])
     return np.array(vertices), np.array(faces)
 
-def normalize_vertices(vertices):
-    min_x, min_y = np.min(vertices, axis=0)
-    max_x, max_y = np.max(vertices, axis=0)
-    
-    width = max_x - min_x
-    height = max_y - min_y
-    
-    scale_factor = 1.0 / max(width, height)
-    
-    vertices_normalized = (vertices - np.array([min_x, min_y])) * scale_factor
+def normalize_vertices(vertices, maximum):
+    vertices_normalized = []
+    for vertex in vertices:
+        vertices_normalized.append([vertex[0]/maximum,vertex[1]/maximum])
     
     return vertices_normalized
 
@@ -69,7 +64,7 @@ def flip_vertically(vertices):
     vertices_flipped = vertices * np.array([1,-1])
     return vertices_flipped
 
-def export_gltf(vertices, faces):
+def export_gltf(vertices, faces, joints):
     points = np.zeros((vertices.shape[0], 3),dtype=np.float32)
     points[:,:2] = vertices.astype(np.float32)
 
@@ -81,10 +76,6 @@ def export_gltf(vertices, faces):
     gltf = pygltflib.GLTF2(
         scene=0,
         scenes=[pygltflib.Scene(nodes=[0])],
-        nodes=[pygltflib.Node(
-            mesh=0,
-            name="Subject"
-        )],
         meshes=[
             pygltflib.Mesh(
                 primitives=[
@@ -131,22 +122,53 @@ def export_gltf(vertices, faces):
             )
         ],
     )
+
+    bones = []
+
+    bones.append(pygltflib.Node(name="Root_Bone", translation=[0.0,0.0,0.0], children=[*range(1,len(joints)+1)]))
+    
+    for idx, joint in enumerate(joints):
+        bone = pygltflib.Node(name=f"Bone_{idx}")
+        bone.translation = [joint[0],joint[1],0.0]
+        bones.append(bone)
+
+    for bone in bones:
+        gltf.nodes.append(bone)
+
+    gltf.nodes.append(
+        pygltflib.Node(
+            name="Mesh",
+            mesh=0
+        )
+    )
+
     binary_blob = triangles_binary_blob + points_binary_blob
     base64_blob = base64.b64encode(binary_blob).decode('utf-8')
     gltf.buffers[0].uri = f"data:application/octet_stream;base64,{base64_blob}"
     gltf.save("export.gltf")
     return "export.gltf"
 
-def generate_mesh(image):
+def generate_mesh(image, skeleton):
     height, width = image.shape
     downscale_factor = 80/height if height >= width else 80/width
-    image = cv2.resize(image, ((int)(width/(1/downscale_factor)),(int)(height/(1/downscale_factor))), cv2.INTER_NEAREST)
+    image = cv2.resize(image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
     _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
-    
     binary = binary/255
 
+    positions = nx.get_node_attributes(skeleton, 'pos')
+    joints = []
+    for idx in positions:
+        joints.append(positions[idx])
+    for joint in joints:
+        joint[0] = joint[0]*downscale_factor
+        joint[1] = joint[1]*downscale_factor
+    
+    joints = normalize_vertices(joints,width*downscale_factor)
+    joints = center_vertices(joints)
+    joints = flip_vertically(joints)
+
     vertices, faces = marching_squares(binary)
-    vertices = normalize_vertices(vertices)
+    vertices = normalize_vertices(vertices,width*downscale_factor)
     vertices = center_vertices(vertices)
     vertices = flip_vertically(vertices)
-    return export_gltf(vertices,faces)
+    return export_gltf(vertices,faces,joints)

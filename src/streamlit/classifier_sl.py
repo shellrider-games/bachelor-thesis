@@ -338,11 +338,8 @@ if input_file is not None:
     st.pyplot(fig)
     
     skeleton_graph = proto_skeleton.to_network_x()
-    positions = nx.get_node_attributes(skeleton_graph, 'pos') 
-    for val in positions:
-        print(positions[val])
 
-    mesh_file_name = generate_mesh(classical_masked_image)
+    mesh_file_name = generate_mesh(classical_masked_image,skeleton_graph)
     st.write("generated_mesh")
     with open (mesh_file_name, "rb") as file:
         btn = st.download_button(
