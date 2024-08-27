@@ -337,7 +337,7 @@ if input_file is not None:
         idx +=1
     st.pyplot(fig)
     
-    skeleton_graph = proto_skeleton.to_network_x()
+    skeleton_graph = skeleton.to_network_x()
 
     mesh_file_name = generate_mesh(classical_masked_image,skeleton_graph)
     st.write("generated_mesh")

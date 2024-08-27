@@ -53,12 +53,13 @@ def normalize_vertices(vertices, maximum):
     for vertex in vertices:
         vertices_normalized.append([vertex[0]/maximum,vertex[1]/maximum])
     
-    return vertices_normalized
+    return np.array(vertices_normalized)
 
-def center_vertices(vertices):
+def center_vertices(vertices, joints):
     center_x, center_y = np.mean(vertices, axis=0)
     vertices_centered = vertices - np.array([center_x, center_y])
-    return vertices_centered
+    joints_centered = joints - np.array([center_x, center_y])
+    return vertices_centered, joints_centered
 
 def flip_vertically(vertices):
     vertices_flipped = vertices * np.array([1,-1])
@@ -150,7 +151,10 @@ def export_gltf(vertices, faces, joints):
 
 def generate_mesh(image, skeleton):
     height, width = image.shape
-    downscale_factor = 80/height if height >= width else 80/width
+    longer_side = height if height >= width else width
+    downscale_factor = 80/longer_side
+
+
     image = cv2.resize(image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
     _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
     binary = binary/255
@@ -160,15 +164,21 @@ def generate_mesh(image, skeleton):
     for idx in positions:
         joints.append(positions[idx])
     for joint in joints:
-        joint[0] = joint[0]*downscale_factor
-        joint[1] = joint[1]*downscale_factor
-    
-    joints = normalize_vertices(joints,width*downscale_factor)
-    joints = center_vertices(joints)
+        print(joint)
+    for joint in joints:
+        x = joint[0]
+        y = joint[1]
+        joint[0] = x*downscale_factor
+        joint[1] = y*downscale_factor
+
+    print(f"Image size: {image.shape}")
+    for joint in joints:
+        print(joint)
+    joints = normalize_vertices(joints,longer_side*downscale_factor)
+    vertices, faces = marching_squares(binary)
+    vertices = normalize_vertices(vertices,longer_side*downscale_factor)
+    vertices, joints = center_vertices(vertices, joints)
+    vertices = flip_vertically(vertices)
     joints = flip_vertically(joints)
 
-    vertices, faces = marching_squares(binary)
-    vertices = normalize_vertices(vertices,width*downscale_factor)
-    vertices = center_vertices(vertices)
-    vertices = flip_vertically(vertices)
     return export_gltf(vertices,faces,joints)
