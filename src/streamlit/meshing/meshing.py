@@ -1,3 +1,4 @@
+from collections import defaultdict, deque
 import cv2
 import numpy as np
 import pygltflib
@@ -65,7 +66,30 @@ def flip_vertically(vertices):
     vertices_flipped = vertices * np.array([1,-1])
     return vertices_flipped
 
-def export_gltf(vertices, faces, joints):
+def bfs_with_children(graph, start):
+    visited = set()
+    queue = deque([start])
+    children_dict = defaultdict(list)
+    
+    while queue:
+        node = queue.popleft()
+        
+        if node not in visited:
+            visited.add(node)
+            
+            # Ensure the node is in the dictionary even if it has no children
+            if node not in children_dict:
+                children_dict[node] = []
+
+            # Explore neighbors
+            for neighbor in graph.neighbors(node):
+                if neighbor not in visited:
+                    children_dict[node].append(neighbor)
+                    queue.append(neighbor)
+    
+    return children_dict
+
+def export_gltf(vertices, faces, joints, skeleton_graph):
     points = np.zeros((vertices.shape[0], 3),dtype=np.float32)
     points[:,:2] = vertices.astype(np.float32)
 
@@ -124,17 +148,50 @@ def export_gltf(vertices, faces, joints):
         ],
     )
 
+    closeness_centrality = nx.closeness_centrality(skeleton_graph)
+    root_start_idx = max(closeness_centrality, key=closeness_centrality.get)
+    discovery_order = bfs_with_children(skeleton_graph, root_start_idx)
+
     bones = []
 
-    bones.append(pygltflib.Node(name="Root_Bone", translation=[0.0,0.0,0.0], children=[*range(1,len(joints)+1)]))
-    
-    for idx, joint in enumerate(joints):
-        bone = pygltflib.Node(name=f"Bone_{idx}")
-        bone.translation = [joint[0],joint[1],0.0]
-        bones.append(bone)
+    node_index_map = {}
 
-    for bone in bones:
-        gltf.nodes.append(bone)
+    print(discovery_order)
+
+    # Create the nodes based on the BFS result
+    for i, parent in enumerate(discovery_order.keys()):
+        print(f"Parent: {parent}")
+        x, y = joints[parent]
+        translation = [x,y,0.0]
+
+        gltf_node = pygltflib.Node(name=f"Bone_{parent}", translation=translation)
+        bones.append(gltf_node)
+        node_index_map[parent] = i
+
+
+    # Update translations to be relative to the parent
+    for parent, children in discovery_order.items():
+        parent_index = node_index_map[parent]
+        parent_coords = joints[parent]
+
+        for child in children:
+            child_index = node_index_map[child]
+            child_coords = joints[child]
+
+            # Calculate the relative translation
+            relative_translation = [
+                child_coords[0] - parent_coords[0],
+                child_coords[1] - parent_coords[1],
+                0.0  # z=0 for 2D coordinates
+            ]
+
+            bones[child_index].translation = relative_translation
+
+        # Set children for the parent node
+        bones[parent_index].children = [node_index_map[child] for child in children]
+
+    # Add all nodes to the GLTF model
+    gltf.nodes.extend(bones)
 
     gltf.nodes.append(
         pygltflib.Node(
@@ -160,20 +217,17 @@ def generate_mesh(image, skeleton):
     binary = binary/255
 
     positions = nx.get_node_attributes(skeleton, 'pos')
+
+    #need to change this here to dictionary apparently
+
     joints = []
     for idx in positions:
         joints.append(positions[idx])
-    for joint in joints:
-        print(joint)
     for joint in joints:
         x = joint[0]
         y = joint[1]
         joint[0] = x*downscale_factor
         joint[1] = y*downscale_factor
-
-    print(f"Image size: {image.shape}")
-    for joint in joints:
-        print(joint)
     joints = normalize_vertices(joints,longer_side*downscale_factor)
     vertices, faces = marching_squares(binary)
     vertices = normalize_vertices(vertices,longer_side*downscale_factor)
@@ -181,4 +235,10 @@ def generate_mesh(image, skeleton):
     vertices = flip_vertically(vertices)
     joints = flip_vertically(joints)
 
-    return export_gltf(vertices,faces,joints)
+    joints_dict = {}
+    counter = 0
+    for idx in positions:
+        joints_dict[idx] = joints[counter]
+        counter += 1
+
+    return export_gltf(vertices,faces,joints_dict,skeleton)
