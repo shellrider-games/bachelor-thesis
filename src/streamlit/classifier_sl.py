@@ -2,7 +2,7 @@ import streamlit as st
 import torch
 import cv2
 import numpy as np
-from nn_model import EnhancedCNNMoreDropout, DeepSketch
+from nn_model import DeepSketch
 from create_models import create_maskrcnn_resnet50_fpn, create_resnet_sketch_parse_r5
 from masking import image_to_mask
 from scipy import ndimage
@@ -13,16 +13,16 @@ from create_skeleton import create_skeleton
 from skeletonization.bonetypes import common
 import networkx as nx
 from matplotlib import pyplot as plt
-import copy
 from skeletonmatching.skeleton_path import match
 import matplotlib.patheffects as path_effects
 from meshing.meshing import generate_mesh
+from sklearn.neighbors import NearestNeighbors
 
 WEIGHTS_PATH = 'classifier_deep_sketch_weights_200.pth'
 MASK_R_CNN_PATH = 'mask_r_cnn_weights.pth'
 SKETCH_PARSE_PATH = 'sketch_parse_weights.pth'
-CAT_PROTOTYPE_PATH = 'cat_proto_mask.jpg'
-CAT_PROTOTYPE_SEGMENTATION_PATH = 'cat_proto_segment.jpg'
+CAT_PROTOTYPE_PATH = 'cat_proto_mask.png'
+CAT_PROTOTYPE_SEGMENTATION_PATH = 'cat_proto_segment.png'
 
 joint_type_to_color = {
     common.JointType.LIMB : (0,0,255),
@@ -141,6 +141,36 @@ def segment(image, model):
     output = np.argmax(output, axis=2)
     return output, pose
 
+def transfer_segmented_to_mask(segmented,mask):
+    segmented = cv2.resize(segmented,(mask.shape[1],mask.shape[0]),interpolation=cv2.INTER_NEAREST)
+    print(f"Segmented shape after resize: {segmented.shape}")
+    print(f"Mask shape: {mask.shape}")
+    print(f"Max value in mask:{mask.max()}")
+    # Create the output image, initialized to zeros (same shape as mask)
+    output_image = np.zeros_like(mask, dtype=segmented.dtype)
+
+    # Find all coordinates where mask is white
+    mask_coords = np.column_stack(np.where(mask == 255))
+    
+    # Find all non-zero coordinates in the segmented image
+    non_zero_coords = np.column_stack(np.where(segmented != 0))
+    non_zero_values = segmented[segmented != 0]
+
+    # Use Nearest Neighbors to find the closest non-zero segmented value for each mask coordinate
+    if len(non_zero_coords) > 0:
+        knn = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(non_zero_coords)
+        distances, indices = knn.kneighbors(mask_coords)
+        nearest_coords = non_zero_coords[indices.flatten()]
+
+        # Assign the nearest non-zero value to the corresponding mask positions in the output image
+        for i, coord in enumerate(mask_coords):
+            output_image[coord[0], coord[1]] = segmented[nearest_coords[i, 0], nearest_coords[i, 1]]
+
+    return output_image
+
+
+
+
 def colour_segmented_image(image):
     colors = {
         0: [0, 0, 0],       # Nothing
@@ -243,16 +273,17 @@ if input_file is not None:
 
     height, width = classical_masked_image.shape[:2]
 
-    aspect_ratio = width / height
-
+   
     if width > height:
+        aspect_ratio = width / height
         new_width = longer_side_length
         new_height = int(new_width / aspect_ratio)
     else:
+        aspect_ratio = height / width
         new_height = longer_side_length
-        new_width = int(new_height * aspect_ratio)
+        new_width = int(new_height / aspect_ratio)
 
-    classical_masked_image = cv2.resize(classical_masked_image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+    classical_masked_image = cv2.resize(classical_masked_image, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
 
     st.image(classical_masked_image,caption="Classical Mask", use_column_width=True)
 
@@ -261,9 +292,9 @@ if input_file is not None:
     sketch_parse_preprocessed_img = preprocess_for_sketch_parse(cropped_from_orig)
  
     segment_image, estimated_pose = segment(sketch_parse_preprocessed_img, sketch_parse_model)
+
     st.image(colour_segmented_image(segment_image), caption="Segmented Image",use_column_width=True)
     st.write(":red[Head] :green[Body] :blue[Leg] :orange[Tail]")
-    print(estimated_pose)
 
     pose_text = "west" if estimated_pose == 1 or estimated_pose == 2 or estimated_pose == 4 or estimated_pose == 7 else "east"
     st.write(f"Estimated subject to be looking {pose_text}")
@@ -273,8 +304,10 @@ if input_file is not None:
         classical_masked_image = cv2.flip(classical_masked_image,1)
         sketch_parse_preprocessed_img = cv2.flip(sketch_parse_preprocessed_img, 1)
 
+    transfed_segmentation = transfer_segmented_to_mask(segment_image, classical_masked_image)
+    st.image(colour_segmented_image(transfed_segmentation),caption="Transfered sgementation",use_column_width=True)
 
-    skeleton = create_skeleton(classical_masked_image, segment_image)
+    skeleton = create_skeleton(classical_masked_image, transfed_segmentation)
     st.image(visualize_skeleton(classical_masked_image,
                                 sketch_parse_preprocessed_img,
                                 skeleton),
@@ -289,7 +322,11 @@ if input_file is not None:
     
     prototype_img = cv2.imread(CAT_PROTOTYPE_PATH, cv2.IMREAD_GRAYSCALE)
     prototype_segmented_img = cv2.imread(CAT_PROTOTYPE_SEGMENTATION_PATH,cv2.IMREAD_GRAYSCALE)
+    prototype_segmented_img = transfer_segmented_to_mask(prototype_segmented_img, prototype_img)
+
     st.image(prototype_img, caption="Prototype mask", use_column_width=True)
+
+    st.image(colour_segmented_image(prototype_segmented_img), caption="Segmented Prototype Image",use_column_width=True)
 
     proto_skeleton = create_skeleton(prototype_img,prototype_segmented_img)
 
@@ -338,12 +375,13 @@ if input_file is not None:
     st.pyplot(fig)
     
     skeleton_graph = skeleton.to_network_x()
+    proto_skeleton_graph = proto_skeleton.to_network_x()
 
-    mesh_file_name = generate_mesh(classical_masked_image,skeleton_graph)
+    mesh_file_name = generate_mesh(prototype_img,proto_skeleton_graph)
     st.write("generated_mesh")
     with open (mesh_file_name, "rb") as file:
         btn = st.download_button(
-            label="Download mesh",
+            label="Download prototype mesh",
             data = file,
             file_name="mesh.gltf"
         )
