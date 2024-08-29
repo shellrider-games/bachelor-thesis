@@ -77,11 +77,9 @@ def bfs_with_children(graph, start):
         if node not in visited:
             visited.add(node)
             
-            # Ensure the node is in the dictionary even if it has no children
             if node not in children_dict:
                 children_dict[node] = []
 
-            # Explore neighbors
             for neighbor in graph.neighbors(node):
                 if neighbor not in visited:
                     children_dict[node].append(neighbor)
@@ -158,7 +156,6 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
 
     print(discovery_order)
 
-    # Create the nodes based on the BFS result
     for i, parent in enumerate(discovery_order.keys()):
         print(f"Parent: {parent}")
         x, y = joints[parent]
@@ -169,7 +166,6 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
         node_index_map[parent] = i
 
 
-    # Update translations to be relative to the parent
     for parent, children in discovery_order.items():
         parent_index = node_index_map[parent]
         parent_coords = joints[parent]
@@ -178,16 +174,14 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
             child_index = node_index_map[child]
             child_coords = joints[child]
 
-            # Calculate the relative translation
             relative_translation = [
                 child_coords[0] - parent_coords[0],
                 child_coords[1] - parent_coords[1],
-                0.0  # z=0 for 2D coordinates
+                0.0
             ]
 
             bones[child_index].translation = relative_translation
 
-        # Set children for the parent node
         bones[parent_index].children = [node_index_map[child] for child in children]
 
     # Add all nodes to the GLTF model
@@ -217,8 +211,6 @@ def generate_mesh(image, skeleton):
     binary = binary/255
 
     positions = nx.get_node_attributes(skeleton, 'pos')
-
-    #need to change this here to dictionary apparently
 
     joints = []
     for idx in positions:
