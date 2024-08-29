@@ -143,26 +143,17 @@ def segment(image, model):
 
 def transfer_segmented_to_mask(segmented,mask):
     segmented = cv2.resize(segmented,(mask.shape[1],mask.shape[0]),interpolation=cv2.INTER_NEAREST)
-    print(f"Segmented shape after resize: {segmented.shape}")
-    print(f"Mask shape: {mask.shape}")
-    print(f"Max value in mask:{mask.max()}")
-    # Create the output image, initialized to zeros (same shape as mask)
+    
     output_image = np.zeros_like(mask, dtype=segmented.dtype)
 
-    # Find all coordinates where mask is white
     mask_coords = np.column_stack(np.where(mask == 255))
     
-    # Find all non-zero coordinates in the segmented image
     non_zero_coords = np.column_stack(np.where(segmented != 0))
-    non_zero_values = segmented[segmented != 0]
 
-    # Use Nearest Neighbors to find the closest non-zero segmented value for each mask coordinate
     if len(non_zero_coords) > 0:
         knn = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(non_zero_coords)
-        distances, indices = knn.kneighbors(mask_coords)
+        _, indices = knn.kneighbors(mask_coords)
         nearest_coords = non_zero_coords[indices.flatten()]
-
-        # Assign the nearest non-zero value to the corresponding mask positions in the output image
         for i, coord in enumerate(mask_coords):
             output_image[coord[0], coord[1]] = segmented[nearest_coords[i, 0], nearest_coords[i, 1]]
 
