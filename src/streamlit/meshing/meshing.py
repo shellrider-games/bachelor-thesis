@@ -4,6 +4,7 @@ import numpy as np
 import pygltflib
 import base64
 import networkx as nx
+from scipy.spatial import KDTree
 
 def interpolate(v1, v2, val1, val2):
     if val1 != val2:
@@ -17,22 +18,23 @@ def marching_squares(image):
     faces = []
 
     lookup_table = {
-        1:  [(0,0), (0.5,0), (0,0.5), (0,0.5), (0.5,0), (0.5,0.5)],  # Bottom-left triangle
-        2:  [(0.5,0), (1,0), (0.5,0.5), (0.5,0.5), (1,0), (1,0.5)],  # Bottom-right triangle
-        4:  [(0.5,0.5), (1,0.5), (0.5,1), (0.5,1), (1,0.5), (1,1)],  # Top-right triangle
-        8:  [(0,0.5), (0.5,0.5), (0,1), (0,1), (0.5,0.5), (0.5,1)],  # Top-left triangle
-        3:  [(0,0), (1,0), (0,1), (1,0), (1,1), (0,1)],              # Vertical edge
-        6:  [(0,0), (1,1), (1,0), (0,0), (0,1), (1,1)],              # Horizontal edge
-        9:  [(0,0), (1,0), (1,1), (0,0), (1,1), (0,1)],              # Diagonal edge
-        12: [(1,1), (0,0), (1,0), (0,1), (0,0), (1,1)],              # Diagonal edge
-        5:  [(0,0), (0.5,0), (0.5,1), (0,0), (0.5,1), (0,1)],        # Left vertical split
-        10: [(0.5,0), (1,0), (1,1), (0.5,0), (1,1), (0.5,1)],        # Right vertical split
-        7:  [(0,0), (1,0), (0,1), (1,0), (1,1), (0,1)],              # Complex top-left, bottom-right
-        14: [(0,0), (1,0), (1,1), (0,0), (1,1), (0,1)],              # Complex top-right, bottom-left
-        13: [(1,0), (0,1), (1,1), (0,0), (0,1), (1,0)],              # Complex bottom-right, top-left
-        11: [(1,0), (1,1), (0,1), (0,0), (0,1), (1,0)],              # Complex bottom-left, top-right
-        15: [(0,0), (1,0), (1,1), (0,0), (1,1), (0,1)],              # Full square
+        1:  [(0,0), (1,0), (0,1)],  # Bottom-left triangle
+        2:  [(0,0), (1,1), (1,0)],  # Bottom-right triangle
+        4:  [(1,1), (0,1), (1,0)],  # Top-right triangle
+        8:  [(0,0), (0,1), (1,1)],  # Top-left triangle
+        3:  [(0,0), (0,1), (1,0), (1,0), (0,1), (1,1)],  # Vertical edge
+        6:  [(0,0), (1,1), (0,1), (0,0), (1,0), (1,1)],  # Horizontal edge
+        9:  [(0,0), (1,0), (0,1), (1,0), (1,1), (0,1)],  # Diagonal edge
+        12: [(0,1), (1,1), (1,0), (0,1), (1,0), (0,0)],  # Diagonal edge
+        5:  [(0,0), (0.5,1), (0,0.5), (0,0), (0,1), (0.5,1)],  # Left vertical split
+        10: [(0.5,0), (0.5,1), (1,0), (1,0), (0.5,1), (1,1)],  # Right vertical split
+        7:  [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Complex top-left, bottom-right
+        14: [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Complex top-right, bottom-left
+        13: [(1,0), (1,1), (0,1), (0,0), (1,0), (0,1)],  # Complex bottom-right, top-left
+        11: [(1,0), (0,1), (1,1), (0,0), (1,0), (0,1)],  # Complex bottom-left, top-right
+        15: [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Full square
     }
+    
     for y in range(rows - 1):
         for x in range(cols - 1):
             square = image[y:y+2, x:x+2]
@@ -46,7 +48,12 @@ def marching_squares(image):
                         vertices.append(v)
                     face_vertices.append(vertices.index(v))
                 for i in range(0, len(face_vertices), 3):
-                    faces.append(face_vertices[i:i+3])
+                    # Ensure the face is oriented clockwise
+                    face = face_vertices[i:i+3]
+                    if (vertices[face[1]][0] - vertices[face[0]][0]) * (vertices[face[2]][1] - vertices[face[0]][1]) - (vertices[face[1]][1] - vertices[face[0]][1]) * (vertices[face[2]][0] - vertices[face[0]][0]) > 0:
+                        face = [face[0], face[2], face[1]]  # Swap last two vertices to flip
+                    faces.append(face)
+                    
     return np.array(vertices), np.array(faces)
 
 def normalize_vertices(vertices, maximum):
@@ -96,9 +103,44 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
     triangles_binary_blob = triangles.flatten().tobytes()
     points_binary_blob = points.tobytes()
 
+    closeness_centrality = nx.closeness_centrality(skeleton_graph)
+    root_start_idx = max(closeness_centrality, key=closeness_centrality.get)
+    discovery_order = bfs_with_children(skeleton_graph, root_start_idx)
+
+    bones = []
+
+    node_index_map = {}
+
+    for i, parent in enumerate(discovery_order.keys()):
+        x, y = joints[parent]
+        translation = [x,y,0.0]
+
+        gltf_node = pygltflib.Node(name=f"Bone_{parent}", translation=translation)
+        bones.append(gltf_node)
+        node_index_map[parent] = i
+
+
+    for parent, children in discovery_order.items():
+        parent_index = node_index_map[parent]
+        parent_coords = joints[parent]
+
+        for child in children:
+            child_index = node_index_map[child]
+            child_coords = joints[child]
+
+            relative_translation = [
+                child_coords[0] - parent_coords[0],
+                child_coords[1] - parent_coords[1],
+                0.0
+            ]
+
+            bones[child_index].translation = relative_translation
+
+        bones[parent_index].children = [node_index_map[child] for child in children]
+
     gltf = pygltflib.GLTF2(
         scene=0,
-        scenes=[pygltflib.Scene(nodes=[0])],
+        scenes=[pygltflib.Scene(nodes=[0,len(bones)])],
         meshes=[
             pygltflib.Mesh(
                 primitives=[
@@ -109,6 +151,7 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
             )
         ],
         accessors=[
+            # Accessor for triangle indices
             pygltflib.Accessor(
                 bufferView=0,
                 componentType=pygltflib.UNSIGNED_INT,
@@ -117,6 +160,7 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
                 max=[int(triangles.max())],
                 min=[int(triangles.min())],
             ),
+            # Accessor for vertex positions
             pygltflib.Accessor(
                 bufferView=1,
                 componentType=pygltflib.FLOAT,
@@ -146,44 +190,6 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
         ],
     )
 
-    closeness_centrality = nx.closeness_centrality(skeleton_graph)
-    root_start_idx = max(closeness_centrality, key=closeness_centrality.get)
-    discovery_order = bfs_with_children(skeleton_graph, root_start_idx)
-
-    bones = []
-
-    node_index_map = {}
-
-    print(discovery_order)
-
-    for i, parent in enumerate(discovery_order.keys()):
-        print(f"Parent: {parent}")
-        x, y = joints[parent]
-        translation = [x,y,0.0]
-
-        gltf_node = pygltflib.Node(name=f"Bone_{parent}", translation=translation)
-        bones.append(gltf_node)
-        node_index_map[parent] = i
-
-
-    for parent, children in discovery_order.items():
-        parent_index = node_index_map[parent]
-        parent_coords = joints[parent]
-
-        for child in children:
-            child_index = node_index_map[child]
-            child_coords = joints[child]
-
-            relative_translation = [
-                child_coords[0] - parent_coords[0],
-                child_coords[1] - parent_coords[1],
-                0.0
-            ]
-
-            bones[child_index].translation = relative_translation
-
-        bones[parent_index].children = [node_index_map[child] for child in children]
-
     # Add all nodes to the GLTF model
     gltf.nodes.extend(bones)
 
@@ -196,17 +202,18 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
 
     binary_blob = triangles_binary_blob + points_binary_blob
     base64_blob = base64.b64encode(binary_blob).decode('utf-8')
-    gltf.buffers[0].uri = f"data:application/octet_stream;base64,{base64_blob}"
+    gltf.buffers[0].uri = f"data:application/octet-stream;base64,{base64_blob}"
     gltf.save("export.gltf")
     return "export.gltf"
 
-def generate_mesh(image, skeleton):
+def generate_mesh(image, skeleton,segmented_image):
     height, width = image.shape
     longer_side = height if height >= width else width
     downscale_factor = 80/longer_side
 
 
     image = cv2.resize(image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
+    segmented_image = cv2.resize(segmented_image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
     _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
     binary = binary/255
 
@@ -222,6 +229,7 @@ def generate_mesh(image, skeleton):
         joint[1] = y*downscale_factor
     joints = normalize_vertices(joints,longer_side*downscale_factor)
     vertices, faces = marching_squares(binary)
+    original_vertices = vertices.copy()
     vertices = normalize_vertices(vertices,longer_side*downscale_factor)
     vertices, joints = center_vertices(vertices, joints)
     vertices = flip_vertically(vertices)
@@ -232,5 +240,48 @@ def generate_mesh(image, skeleton):
     for idx in positions:
         joints_dict[idx] = joints[counter]
         counter += 1
+
+    kdtree = KDTree(vertices)
+
+    end_effectors = [node for node, degree in skeleton.degree() if degree == 1]
+    nearest_vertices = {}
+     # Cache vertex classes to avoid repeated lookups
+    vertex_classes = {i: segmented_image[int(original_vertices[i][1])][int(original_vertices[i][0])] for i in range(len(original_vertices))}
+
+    # Iterate over each end effector to find the nearest vertex and perform flood fill
+    for end_effector in end_effectors:
+        end_effector_pos = np.array(joints_dict[end_effector])
+        
+        # Find the nearest vertex using KDTree
+        nearest_vertex_idx = kdtree.query(end_effector_pos)[1]
+
+        # Get the class of the nearest vertex from the cache
+        nearest_vertex_class = vertex_classes[nearest_vertex_idx]
+
+        # Perform flood fill to find all vertices of the same class
+        visited = set()
+        queue = deque([nearest_vertex_idx])
+        vertex_list = []
+
+        while queue:
+            current_idx = queue.popleft()  # Faster pop from the left
+            if current_idx in visited:
+                continue
+
+            visited.add(current_idx)
+            vertex_list.append(current_idx)
+
+            # Check neighbors of the current vertex
+            for face in faces:
+                if current_idx in face:
+                    for vertex_idx in face:
+                        if vertex_idx not in visited and vertex_classes[vertex_idx] == nearest_vertex_class:
+                            queue.append(vertex_idx)
+
+        nearest_vertices[end_effector] = vertex_list
+    
+    print(nearest_vertices)
+ 
+
 
     return export_gltf(vertices,faces,joints_dict,skeleton)

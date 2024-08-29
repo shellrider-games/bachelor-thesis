@@ -368,7 +368,7 @@ if input_file is not None:
     skeleton_graph = skeleton.to_network_x()
     proto_skeleton_graph = proto_skeleton.to_network_x()
 
-    mesh_file_name = generate_mesh(prototype_img,proto_skeleton_graph)
+    mesh_file_name = generate_mesh(prototype_img,proto_skeleton_graph,prototype_segmented_img)
     st.write("generated_mesh")
     with open (mesh_file_name, "rb") as file:
         btn = st.download_button(
