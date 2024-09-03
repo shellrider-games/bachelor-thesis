@@ -280,6 +280,22 @@ def generate_mesh(image, skeleton,segmented_image):
 
         nearest_vertices[end_effector] = vertex_list
     
+    # Find and assign remaining vertices to the nearest joint
+    all_assigned_vertices = {v for verts in nearest_vertices.values() for v in verts}
+    remaining_vertices = set(range(len(vertices))) - all_assigned_vertices
+
+    # Create a KDTree for joints to find the nearest joint for remaining vertices
+    joints_kdtree = KDTree(list(joints_dict.values()))
+
+    for vertex_idx in remaining_vertices:
+        vertex_pos = vertices[vertex_idx]
+        nearest_joint_idx = joints_kdtree.query(vertex_pos)[1]
+        nearest_joint = list(joints_dict.keys())[nearest_joint_idx]
+        if nearest_joint in nearest_vertices:
+            nearest_vertices[nearest_joint].append(vertex_idx)
+        else:
+            nearest_vertices[nearest_joint] = [vertex_idx]
+
     print(nearest_vertices)
  
 
