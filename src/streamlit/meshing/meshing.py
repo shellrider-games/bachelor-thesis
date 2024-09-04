@@ -16,6 +16,7 @@ def marching_squares(image):
     rows, cols = image.shape
     vertices = []
     faces = []
+    uvs = []
 
     lookup_table = {
         1:  [(0,0), (1,0), (0,1)],  # Bottom-left triangle
@@ -46,6 +47,7 @@ def marching_squares(image):
                     v = (x + vert[0], y + vert[1])
                     if v not in vertices:
                         vertices.append(v)
+                        uvs.append((v[0] / cols, 1 - v[1] / rows))  # Normalize UVs
                     face_vertices.append(vertices.index(v))
                 for i in range(0, len(face_vertices), 3):
                     # Ensure the face is oriented clockwise
@@ -54,7 +56,11 @@ def marching_squares(image):
                         face = [face[0], face[2], face[1]]  # Swap last two vertices to flip
                     faces.append(face)
                     
-    return np.array(vertices), np.array(faces)
+    return np.array(vertices), np.array(faces), np.array(uvs)
+
+
+def positions_match(pos1, pos2, tolerance=1e-5):
+    return abs(pos1[0] - pos2[0]) < tolerance and abs(pos1[1] - pos2[1]) < tolerance
 
 def normalize_vertices(vertices, maximum):
     vertices_normalized = []
@@ -93,6 +99,32 @@ def bfs_with_children(graph, start):
                     queue.append(neighbor)
     
     return children_dict
+
+def export_obj(vertices, faces, uvs, skinning):
+    obj_lines = []
+
+    # Write vertices
+    for vertex in vertices:
+        obj_lines.append(f"v {vertex[0]} {vertex[1]} 0.0")
+
+    # Write UVs
+    for uv in uvs:
+        obj_lines.append(f"vt {uv[0]} {uv[1]}")
+
+    # Write faces with vertex/texture coordinates
+    for face in faces:
+        obj_lines.append(f"f {face[0] + 1}/{face[0] + 1} {face[1] + 1}/{face[1] + 1} {face[2] + 1}/{face[2] + 1}")
+
+    # Write the OBJ file to disk
+    with open("export.obj", "w") as obj_file:
+        obj_file.write("\n".join(obj_lines))
+
+    with open("skinning.txt", "w") as skinning_file:
+        for k, v in skinning.items():
+            for vertex in v:
+                skinning_file.write(f"{vertex} {k}\n")
+
+    return "export.obj" , "skinning.txt"
 
 def export_gltf(vertices, faces, joints, skeleton_graph):
     points = np.zeros((vertices.shape[0], 3),dtype=np.float32)
@@ -206,16 +238,35 @@ def export_gltf(vertices, faces, joints, skeleton_graph):
     gltf.save("export.gltf")
     return "export.gltf"
 
-def generate_mesh(image, skeleton,segmented_image):
+def generate_mesh(image, skeleton ,segmented_image, matched_joints):
     height, width = image.shape
     longer_side = height if height >= width else width
     downscale_factor = 80/longer_side
 
-
     image = cv2.resize(image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
-    segmented_image = cv2.resize(segmented_image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
+    # Check if segmented_image is valid
+    if segmented_image is None or segmented_image.size == 0:
+        raise ValueError("segmented_image is invalid or empty.")
+
+    # Calculate new dimensions
+    new_width = int(width * downscale_factor)
+    new_height = int(height * downscale_factor)
+
+    # Ensure dimensions are valid
+    if new_width <= 0 or new_height <= 0:
+        raise ValueError("Calculated dimensions are invalid (<= 0). Check the downscale_factor.")
+
+    # Perform the resize
+    segmented_image = cv2.resize(segmented_image, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
+
+    
     _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
     binary = binary/255
+
+    joint_to_mapping = {}
+
+    for a,b in matched_joints:
+        joint_to_mapping[a.id] = b.id
 
     positions = nx.get_node_attributes(skeleton, 'pos')
 
@@ -228,7 +279,7 @@ def generate_mesh(image, skeleton,segmented_image):
         joint[0] = x*downscale_factor
         joint[1] = y*downscale_factor
     joints = normalize_vertices(joints,longer_side*downscale_factor)
-    vertices, faces = marching_squares(binary)
+    vertices, faces, uvs = marching_squares(binary)
     original_vertices = vertices.copy()
     vertices = normalize_vertices(vertices,longer_side*downscale_factor)
     vertices, joints = center_vertices(vertices, joints)
@@ -251,7 +302,7 @@ def generate_mesh(image, skeleton,segmented_image):
     # Iterate over each end effector to find the nearest vertex and perform flood fill
     for end_effector in end_effectors:
         end_effector_pos = np.array(joints_dict[end_effector])
-        
+       
         # Find the nearest vertex using KDTree
         nearest_vertex_idx = kdtree.query(end_effector_pos)[1]
 
@@ -296,8 +347,13 @@ def generate_mesh(image, skeleton,segmented_image):
         else:
             nearest_vertices[nearest_joint] = [vertex_idx]
 
-    print(nearest_vertices)
- 
+    prototype_joint_to_vertices = {}
 
+    for k in nearest_vertices:
+        if joint_to_mapping.keys().__contains__(k):
+            print(f"vertices for prototype joint: {joint_to_mapping[k]} : {nearest_vertices[k]}")
+            prototype_joint_to_vertices[joint_to_mapping[k]] = nearest_vertices[k]
 
-    return export_gltf(vertices,faces,joints_dict,skeleton)
+    
+
+    return export_obj(vertices,faces,uvs,prototype_joint_to_vertices)

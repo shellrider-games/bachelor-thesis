@@ -294,11 +294,11 @@ if input_file is not None:
         segment_image = cv2.flip(segment_image, 1)
         classical_masked_image = cv2.flip(classical_masked_image,1)
         sketch_parse_preprocessed_img = cv2.flip(sketch_parse_preprocessed_img, 1)
+    transferredd_segmentation = transfer_segmented_to_mask(segment_image, classical_masked_image)
 
-    transfed_segmentation = transfer_segmented_to_mask(segment_image, classical_masked_image)
-    st.image(colour_segmented_image(transfed_segmentation),caption="Transfered sgementation",use_column_width=True)
-
-    skeleton = create_skeleton(classical_masked_image, transfed_segmentation)
+    st.image(colour_segmented_image(transferredd_segmentation),caption="Transfered sgementation",use_column_width=True)
+    skeleton = create_skeleton(classical_masked_image, transferredd_segmentation)
+    
     st.image(visualize_skeleton(classical_masked_image,
                                 sketch_parse_preprocessed_img,
                                 skeleton),
@@ -368,11 +368,19 @@ if input_file is not None:
     skeleton_graph = skeleton.to_network_x()
     proto_skeleton_graph = proto_skeleton.to_network_x()
 
-    mesh_file_name = generate_mesh(prototype_img,proto_skeleton_graph,prototype_segmented_img)
-    st.write("generated_mesh")
+
+
+    #mesh_file_name, skin_file_name = generate_mesh(prototype_img, proto_skeleton_graph, prototype_segmented_img, matched_joints)
+    mesh_file_name, skin_file_name = generate_mesh(classical_masked_image, skeleton_graph, transferredd_segmentation, matched_joints)
     with open (mesh_file_name, "rb") as file:
         btn = st.download_button(
-            label="Download prototype mesh",
+            label="Download mesh",
             data = file,
-            file_name="mesh.gltf"
+            file_name="mesh.obj"
+        )
+    with open (skin_file_name, "rb") as file:
+        btn = st.download_button(
+            label="Download skinning information",
+            data = file,
+            file_name="skin.txt"
         )
