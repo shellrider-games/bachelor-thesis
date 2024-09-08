@@ -1,8 +1,6 @@
 from collections import defaultdict, deque
 import cv2
 import numpy as np
-import pygltflib
-import base64
 import networkx as nx
 from scipy.spatial import KDTree
 
@@ -21,19 +19,19 @@ def marching_squares(image):
     lookup_table = {
         1:  [(0,0), (1,0), (0,1)],  # Bottom-left triangle
         2:  [(0,0), (1,1), (1,0)],  # Bottom-right triangle
-        4:  [(1,1), (0,1), (1,0)],  # Top-right triangle
-        8:  [(0,0), (0,1), (1,1)],  # Top-left triangle
         3:  [(0,0), (0,1), (1,0), (1,0), (0,1), (1,1)],  # Vertical edge
-        6:  [(0,0), (1,1), (0,1), (0,0), (1,0), (1,1)],  # Horizontal edge
-        9:  [(0,0), (1,0), (0,1), (1,0), (1,1), (0,1)],  # Diagonal edge
-        12: [(0,1), (1,1), (1,0), (0,1), (1,0), (0,0)],  # Diagonal edge
+        4:  [(1,1), (0,1), (1,0)],  # Top-right triangle
         5:  [(0,0), (0.5,1), (0,0.5), (0,0), (0,1), (0.5,1)],  # Left vertical split
-        10: [(0.5,0), (0.5,1), (1,0), (1,0), (0.5,1), (1,1)],  # Right vertical split
+        6:  [(0,0), (1,1), (0,1), (0,0), (1,0), (1,1)],  # Horizontal edge
         7:  [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Complex top-left, bottom-right
-        14: [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Complex top-right, bottom-left
-        13: [(1,0), (1,1), (0,1), (0,0), (1,0), (0,1)],  # Complex bottom-right, top-left
+        8:  [(0,0), (0,1), (1,1)],  # Top-left triangle
+        9:  [(0,0), (1,0), (0,1), (1,0), (1,1), (0,1)],  # Diagonal edge
+        10: [(0.5,0), (0.5,1), (1,0), (1,0), (0.5,1), (1,1)],  # Right vertical split
         11: [(1,0), (0,1), (1,1), (0,0), (1,0), (0,1)],  # Complex bottom-left, top-right
-        15: [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Full square
+        12: [(0,1), (1,1), (1,0), (0,1), (1,0), (0,0)],  # Diagonal edge
+        13: [(1,0), (1,1), (0,1), (0,0), (1,0), (0,1)],  # Complex bottom-right, top-left        
+        14: [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Complex top-right, bottom-left
+        15: [(0,0), (0,1), (1,0), (0,1), (1,1), (1,0)],  # Full squarec
     }
     
     for y in range(rows - 1):
@@ -126,124 +124,13 @@ def export_obj(vertices, faces, uvs, skinning):
 
     return "export.obj" , "skinning.txt"
 
-def export_gltf(vertices, faces, joints, skeleton_graph):
-    points = np.zeros((vertices.shape[0], 3),dtype=np.float32)
-    points[:,:2] = vertices.astype(np.float32)
-
-    triangles = faces.astype(np.uint32)
-    
-    triangles_binary_blob = triangles.flatten().tobytes()
-    points_binary_blob = points.tobytes()
-
-    closeness_centrality = nx.closeness_centrality(skeleton_graph)
-    root_start_idx = max(closeness_centrality, key=closeness_centrality.get)
-    discovery_order = bfs_with_children(skeleton_graph, root_start_idx)
-
-    bones = []
-
-    node_index_map = {}
-
-    for i, parent in enumerate(discovery_order.keys()):
-        x, y = joints[parent]
-        translation = [x,y,0.0]
-
-        gltf_node = pygltflib.Node(name=f"Bone_{parent}", translation=translation)
-        bones.append(gltf_node)
-        node_index_map[parent] = i
-
-
-    for parent, children in discovery_order.items():
-        parent_index = node_index_map[parent]
-        parent_coords = joints[parent]
-
-        for child in children:
-            child_index = node_index_map[child]
-            child_coords = joints[child]
-
-            relative_translation = [
-                child_coords[0] - parent_coords[0],
-                child_coords[1] - parent_coords[1],
-                0.0
-            ]
-
-            bones[child_index].translation = relative_translation
-
-        bones[parent_index].children = [node_index_map[child] for child in children]
-
-    gltf = pygltflib.GLTF2(
-        scene=0,
-        scenes=[pygltflib.Scene(nodes=[0,len(bones)])],
-        meshes=[
-            pygltflib.Mesh(
-                primitives=[
-                    pygltflib.Primitive(
-                        attributes=pygltflib.Attributes(POSITION=1), indices=0
-                    )
-                ]
-            )
-        ],
-        accessors=[
-            # Accessor for triangle indices
-            pygltflib.Accessor(
-                bufferView=0,
-                componentType=pygltflib.UNSIGNED_INT,
-                count=triangles.size,
-                type=pygltflib.SCALAR,
-                max=[int(triangles.max())],
-                min=[int(triangles.min())],
-            ),
-            # Accessor for vertex positions
-            pygltflib.Accessor(
-                bufferView=1,
-                componentType=pygltflib.FLOAT,
-                count=len(points),
-                type=pygltflib.VEC3,
-                max=points.max(axis=0).tolist(),
-                min=points.min(axis=0).tolist(),
-            ),
-        ],
-        bufferViews=[
-            pygltflib.BufferView(
-                buffer=0,
-                byteLength=len(triangles_binary_blob),
-                target=pygltflib.ELEMENT_ARRAY_BUFFER,
-            ),
-            pygltflib.BufferView(
-                buffer=0,
-                byteOffset=len(triangles_binary_blob),
-                byteLength=len(points_binary_blob),
-                target=pygltflib.ARRAY_BUFFER,
-            ),
-        ],
-        buffers=[
-            pygltflib.Buffer(
-                byteLength=len(triangles_binary_blob) + len(points_binary_blob)
-            )
-        ],
-    )
-
-    # Add all nodes to the GLTF model
-    gltf.nodes.extend(bones)
-
-    gltf.nodes.append(
-        pygltflib.Node(
-            name="Mesh",
-            mesh=0
-        )
-    )
-
-    binary_blob = triangles_binary_blob + points_binary_blob
-    base64_blob = base64.b64encode(binary_blob).decode('utf-8')
-    gltf.buffers[0].uri = f"data:application/octet-stream;base64,{base64_blob}"
-    gltf.save("export.gltf")
-    return "export.gltf"
-
-def generate_mesh(image, skeleton ,segmented_image, matched_joints):
+def generate_mesh(image, skeleton, segmented_image, matched_joints):
     height, width = image.shape
     longer_side = height if height >= width else width
-    downscale_factor = 80/longer_side
+    downscale_factor = 80 / longer_side
 
-    image = cv2.resize(image, ((int)(width*downscale_factor),(int)(height*downscale_factor)), cv2.INTER_NEAREST)
+    image = cv2.resize(image, ((int)(width * downscale_factor), (int)(height * downscale_factor)), cv2.INTER_NEAREST)
+    
     # Check if segmented_image is valid
     if segmented_image is None or segmented_image.size == 0:
         raise ValueError("segmented_image is invalid or empty.")
@@ -259,13 +146,12 @@ def generate_mesh(image, skeleton ,segmented_image, matched_joints):
     # Perform the resize
     segmented_image = cv2.resize(segmented_image, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
 
-    
     _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
-    binary = binary/255
+    binary = binary / 255
 
     joint_to_mapping = {}
 
-    for a,b in matched_joints:
+    for a, b in matched_joints:
         joint_to_mapping[a.id] = b.id
 
     positions = nx.get_node_attributes(skeleton, 'pos')
@@ -276,12 +162,12 @@ def generate_mesh(image, skeleton ,segmented_image, matched_joints):
     for joint in joints:
         x = joint[0]
         y = joint[1]
-        joint[0] = x*downscale_factor
-        joint[1] = y*downscale_factor
-    joints = normalize_vertices(joints,longer_side*downscale_factor)
+        joint[0] = x * downscale_factor
+        joint[1] = y * downscale_factor
+    joints = normalize_vertices(joints, longer_side * downscale_factor)
     vertices, faces, uvs = marching_squares(binary)
     original_vertices = vertices.copy()
-    vertices = normalize_vertices(vertices,longer_side*downscale_factor)
+    vertices = normalize_vertices(vertices, longer_side * downscale_factor)
     vertices, joints = center_vertices(vertices, joints)
     vertices = flip_vertically(vertices)
     joints = flip_vertically(joints)
@@ -292,68 +178,92 @@ def generate_mesh(image, skeleton ,segmented_image, matched_joints):
         joints_dict[idx] = joints[counter]
         counter += 1
 
+    # Create a KDTree for the joint positions
+    joint_positions = list(joints_dict.values())
+    joint_kdtree = KDTree(joint_positions)
+    
     kdtree = KDTree(vertices)
-
     end_effectors = [node for node, degree in skeleton.degree() if degree == 1]
-    nearest_vertices = {}
-     # Cache vertex classes to avoid repeated lookups
-    vertex_classes = {i: segmented_image[int(original_vertices[i][1])][int(original_vertices[i][0])] for i in range(len(original_vertices))}
 
-    # Iterate over each end effector to find the nearest vertex and perform flood fill
+    vertex_classes = {i: segmented_image[int(original_vertices[i][1])][int(original_vertices[i][0])] for i in range(len(original_vertices))}
+    
+    # Dictionary to store nearest vertices for each end effector and their flood fill steps
+    nearest_vertices = {}
+    vertex_flood_fill_steps = {}  # Keeps track of the minimum flood fill steps for each vertex
+
     for end_effector in end_effectors:
         end_effector_pos = np.array(joints_dict[end_effector])
-       
-        # Find the nearest vertex using KDTree
+        
+        # Find the nearest vertex to the end effector using the KDTree
         nearest_vertex_idx = kdtree.query(end_effector_pos)[1]
-
-        # Get the class of the nearest vertex from the cache
+        
         nearest_vertex_class = vertex_classes[nearest_vertex_idx]
-
-        # Perform flood fill to find all vertices of the same class
+        
         visited = set()
-        queue = deque([nearest_vertex_idx])
+        queue = deque([(nearest_vertex_idx, 0)])  # (vertex index, flood fill steps)
         vertex_list = []
-
+        
         while queue:
-            current_idx = queue.popleft()  # Faster pop from the left
+            current_idx, steps = queue.popleft()
             if current_idx in visited:
                 continue
 
             visited.add(current_idx)
+
+            # Check if the current vertex is already assigned to another joint
+            if current_idx in vertex_flood_fill_steps:
+                # Reassign if this joint reaches the vertex with fewer steps
+                if steps < vertex_flood_fill_steps[current_idx]:
+                    nearest_vertices[current_idx] = end_effector
+                    vertex_flood_fill_steps[current_idx] = steps
+            else:
+                # Assign this vertex to the current joint
+                nearest_vertices[current_idx] = end_effector
+                vertex_flood_fill_steps[current_idx] = steps
+
             vertex_list.append(current_idx)
 
-            # Check neighbors of the current vertex
+            # Explore neighboring vertices from the faces connected to this vertex
             for face in faces:
                 if current_idx in face:
                     for vertex_idx in face:
                         if vertex_idx not in visited and vertex_classes[vertex_idx] == nearest_vertex_class:
-                            queue.append(vertex_idx)
+                            queue.append((vertex_idx, steps + 1))
 
-        nearest_vertices[end_effector] = vertex_list
-    
-    # Find and assign remaining vertices to the nearest joint
-    all_assigned_vertices = {v for verts in nearest_vertices.values() for v in verts}
+    # Step 2: Ensure every vertex is assigned
+    all_assigned_vertices = set(nearest_vertices.keys())
     remaining_vertices = set(range(len(vertices))) - all_assigned_vertices
 
-    # Create a KDTree for joints to find the nearest joint for remaining vertices
-    joints_kdtree = KDTree(list(joints_dict.values()))
-
+    # Handle remaining vertices (like edge vertices) by assigning them to the closest joint using the joint KDTree
     for vertex_idx in remaining_vertices:
         vertex_pos = vertices[vertex_idx]
-        nearest_joint_idx = joints_kdtree.query(vertex_pos)[1]
+        
+        # Find the nearest joint geometrically using the joint KDTree
+        nearest_joint_idx = joint_kdtree.query(vertex_pos)[1]
         nearest_joint = list(joints_dict.keys())[nearest_joint_idx]
-        if nearest_joint in nearest_vertices:
-            nearest_vertices[nearest_joint].append(vertex_idx)
-        else:
-            nearest_vertices[nearest_joint] = [vertex_idx]
+        
+        # Assign the vertex to the nearest joint
+        if nearest_joint is not None:
+            nearest_vertices[vertex_idx] = nearest_joint
 
+    # Now verify that every vertex has a joint assigned
+    for i in range(len(vertices)):
+        if i not in nearest_vertices:
+            # If a vertex is still not assigned, assign it to the nearest joint geometrically
+            nearest_joint_idx = joint_kdtree.query(vertices[i])[1]
+            nearest_joint = list(joints_dict.keys())[nearest_joint_idx]
+            nearest_vertices[i] = nearest_joint
+
+    # Group vertices by the mapped joint
     prototype_joint_to_vertices = {}
 
-    for k in nearest_vertices:
-        if joint_to_mapping.keys().__contains__(k):
-            print(f"vertices for prototype joint: {joint_to_mapping[k]} : {nearest_vertices[k]}")
-            prototype_joint_to_vertices[joint_to_mapping[k]] = nearest_vertices[k]
+    for vertex_idx, joint in nearest_vertices.items():
+        if joint in joint_to_mapping:
+            prototype_joint = joint_to_mapping[joint]
+            print(f"vertices for prototype joint: {prototype_joint} : {vertex_idx}")
+            if prototype_joint not in prototype_joint_to_vertices:
+                prototype_joint_to_vertices[prototype_joint] = []
+            prototype_joint_to_vertices[prototype_joint].append(vertex_idx)
 
-    
+    return export_obj(vertices, faces, uvs, prototype_joint_to_vertices)
 
-    return export_obj(vertices,faces,uvs,prototype_joint_to_vertices)
